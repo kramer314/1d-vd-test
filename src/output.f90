@@ -4,6 +4,7 @@ module output
   use log, only: log_log_info
 
   use progvars
+  use gaussian, only: gaussian_p
 
   implicit none
 
@@ -14,19 +15,19 @@ module output
 
   public :: output_psi_xt
   public :: output_vd_counts
-  
+
   public :: output_logfile_unit
 
   ! Output file unit numers
   integer(ip), parameter :: logfile_unit = 99
   integer(ip), parameter :: output_logfile_unit = logfile_unit
-  
+
   integer(ip), parameter :: psi_xt_unit = 98
   integer(ip), parameter :: vd_px_unit = 97
 
 contains
   subroutine output_init()
-    
+
     call files_ensure_dir(output_dir)
 
     open(unit=logfile_unit, file=trim(output_dir)//trim(log_fname))
@@ -36,12 +37,12 @@ contains
   end subroutine output_init
 
   subroutine output_cleanup()
-    
+
     close(unit=logfile_unit)
     close(unit=psi_xt_unit)
 
   end subroutine output_cleanup
-  
+
   subroutine output_psi_xt()
     integer(ip) :: i_x
 
@@ -52,7 +53,7 @@ contains
        end if
     end do
     write(psi_xt_unit, *)
-    
+
   end subroutine output_psi_xt
 
   subroutine output_vd_counts()
@@ -62,7 +63,7 @@ contains
     call log_log_info("Writing out VD results", logfile_unit)
     do i_px = 1, size(npx_arr)
        px = vd_px_arr(i_px)
-       write(vd_px_unit, *) px, npx_arr(i_px)
+       write(vd_px_unit, *) px, npx_arr(i_px), abs(gaussian_p(px))**2
     end do
   end subroutine output_vd_counts
 end module output

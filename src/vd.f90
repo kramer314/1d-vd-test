@@ -1,9 +1,10 @@
 module vd
 
   use log, only: log_log_critical, log_stderr
-  use numerics, only: numerics_linspace, numerics_cmplx_phase, numerics_d1, &
+  use numerics, only: numerics_cmplx_phase, numerics_d1, numerics_d2, &
        numerics_trapz
-  
+  use dists, only: dists_gaussian
+
   use progvars
   use output, only: output_logfile_unit
 
@@ -17,9 +18,10 @@ module vd
   public :: vd_update
 
   integer(ip), parameter :: logfile_unit = output_logfile_unit
-  
+
   ! Work arrays
   real(fp), allocatable :: phi_arr(:), p_arr(:)
+  real(fp), allocatable :: p_var_arr(:)
   real(fp), allocatable :: mag_arr(:), j_arr(:)
   real(fp), allocatable :: prob_arr(:)
 
@@ -29,7 +31,7 @@ contains
     logical :: sane
 
     character(:), allocatable :: error_msg
-    
+
     ! Check internal / external / virtual detector grid limits
 
     sane = .true.
@@ -59,10 +61,11 @@ contains
     ! Allocate work arrays
     allocate(phi_arr(nx))
     allocate(p_arr(nx))
+    allocate(p_var_arr(nx))
     allocate(mag_arr(nx))
     allocate(j_arr(nx))
     allocate(prob_arr(nx))
-    
+
   end subroutine vd_init
 
   subroutine vd_cleanup
@@ -71,6 +74,7 @@ contains
     deallocate(prob_arr)
     deallocate(j_arr)
     deallocate(mag_arr)
+    deallocate(p_var_arr)
     deallocate(p_arr)
     deallocate(phi_arr)
   end subroutine vd_cleanup
@@ -82,7 +86,7 @@ contains
 
     np_norm = numerics_trapz(np_arr, vd_dpx)
     np_arr(:) = np_arr(:) / np_norm
-    
+
   end subroutine vd_normalize
 
   subroutine vd_update(psi_arr, np_arr)
@@ -93,7 +97,7 @@ contains
     call vd_fill_arrays(psi_arr)
     call vd_calc_pj
     call vd_bin(np_arr)
-    
+
   end subroutine vd_update
 
   subroutine vd_bin(np_arr)
@@ -102,37 +106,38 @@ contains
     integer(ip) :: i_x
 
     do i_x = vd_xl_min, vd_xl_max
-       call accumulate_counts(i_x, p_arr, j_arr, np_arr, vd_px_arr, vd_dpx)
+       call accumulate_counts(i_x, np_arr)
+!       call accumulate_counts(i_x, p_arr, j_arr, np_arr, vd_px_arr, vd_dpx)
     end do
     do i_x = vd_xr_min, vd_xr_max
-       call accumulate_counts(i_x, p_arr, j_arr, np_arr, vd_px_arr, vd_dpx)
+       call accumulate_counts(i_x, np_arr)
+!       call accumulate_counts_old(i_x, p_arr, j_arr, np_arr, vd_px_arr, vd_dpx)
     end do
 
   contains
 
-    subroutine accumulate_counts(i_x, p_arr, j_arr, count_arr, p_bin_arr, &
-         dp_bin)
+    subroutine accumulate_counts(i_x, count_arr)
       integer(ip), intent(in) :: i_x
       real(fp), intent(inout) :: count_arr(:)
-      real(fp), intent(in) :: p_arr(:), j_arr(:)
-      real(fp), intent(in) :: p_bin_arr(:), dp_bin
 
-      real(fp) :: p_bin_min
+      real(fp) :: p, p_mu, p_var
+      real(fp) :: scale
       integer(ip) :: i_p
-      real(fp) :: p
+      ! mean
+      p_mu = p_arr(i_x)
+      ! variance
+      p_var = p_var_arr(i_x)
 
-      p = p_arr(i_x)
+      ! Make Gaussian of variance p_var around p, and populate momentum dist. with that
+      scale = dt * abs(j_arr(i_x)) !* vd_dpx * mag_arr(i_x)
 
-      ! Mid-point histogram
-      p_bin_min = p_bin_arr(1) - dp_bin / 2
-      ! Calculate bin index - much more efficient than brute force
-      i_p = ceiling((p - p_bin_min) / dp_bin)
+      do i_p = 1, vd_npx
+         p = vd_px_arr(i_p)
+         count_arr(i_p) = count_arr(i_p) + scale * dists_gaussian(p, p_mu, p_var)
+      end do
 
-      if (i_p .ge. 1 .and. i_p .le. size(p_bin_arr)) then
-         count_arr(i_p) = count_arr(i_p) + dp_bin * abs(j_arr(i_x)) * dt
-      end if
     end subroutine accumulate_counts
-    
+
   end subroutine vd_bin
 
   subroutine vd_calc_pj()
@@ -143,6 +148,15 @@ contains
     call numerics_d1(phi_arr(vd_xr_min - 1 : vd_xr_max + 1), &
          p_arr(vd_xr_min - 1 : vd_xr_max + 1), dx)
 
+    ! Calculate second moment of local momentum dist.
+    ! From Iafrate, G., et al. Journal de Physique 42.C7.10 (1981).
+    call numerics_d2(log(mag_arr(vd_xl_min - 1 : vd_xl_max + 1)), &
+         p_var_arr(vd_xl_min - 1 : vd_xl_max + 1), dx)
+    call numerics_d2(log(mag_arr(vd_xr_min - 1 : vd_xr_max + 1)), &
+         p_var_arr(vd_xr_min - 1 : vd_xr_max + 1), dx)
+
+    p_var_arr(:) = - hbar**2 / 4.0_fp * p_var_arr(:)
+
     ! Calculate j_local = rho * p_local / m
     j_arr(vd_xl_min : vd_xl_max) = mag_arr(vd_xl_min : vd_xl_max) / m * &
          p_arr(vd_xl_min : vd_xl_max)
@@ -150,7 +164,7 @@ contains
          p_arr(vd_xr_min : vd_xr_max)
 
   end subroutine vd_calc_pj
-  
+
   subroutine vd_fill_arrays(psi_arr)
     ! Calculate R^2(x,t), S(x,t) where Psi = R exp(i S / hbar)
     complex(fp), intent(in) :: psi_arr(:)
@@ -178,9 +192,9 @@ contains
       ! multiply by hbar here since Psi ~ exp(i S / hbar)
       phi_arr(i_x) = numerics_cmplx_phase(z) * hbar
       mag_arr(i_x) = abs(z)**2
-      
+
     end subroutine fill_by_index
-    
+
   end subroutine vd_fill_arrays
 
 end module vd

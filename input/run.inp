@@ -27,7 +27,7 @@ nxl_external = 100
 nxr_external = 100
 ! # of virtual detector points
 vd_nxl = 0
-vd_nxr = 20
+vd_nxr = 10
 
 ! Virtual detector binning parameters
 vd_px_min = 0.0

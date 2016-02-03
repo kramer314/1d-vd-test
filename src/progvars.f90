@@ -1,13 +1,13 @@
 module progvars
-  use globvars, only: sp, sp_format, ip, pi_dp, e_dp, j_dp
+  use globvars, only: dp, dp_format, ip, pi_dp, e_dp, j_dp
   use config, only: config_get_param
   use numerics, only: numerics_linspace
 
   implicit none
 
   ! Real kind parameter / formatting
-  integer(ip), parameter :: fp = sp
-  character(*), parameter :: fp_format = sp_format
+  integer(ip), parameter :: fp = dp
+  character(*), parameter :: fp_format = dp_format
 
   ! Numerical constants
   real(fp), parameter :: pi = real(pi_dp, kind=fp)
@@ -84,7 +84,7 @@ contains
 
     deallocate(vd_px_arr)
     deallocate(npx_arr)
-    
+
     deallocate(x_range)
     deallocate(t_range)
     deallocate(psi_arr)
@@ -97,7 +97,7 @@ contains
 
     ! Initialize virtual detector grids
     call numerics_linspace(vd_px_min, vd_px_max, vd_px_arr, vd_dpx)
-    
+
     ! Initialize virtual detector counts
     npx_arr(:) = 0.0_fp
   end subroutine progvars_set_arrays
@@ -130,7 +130,7 @@ contains
     call config_get_param("vd_px_min", vd_px_min, success)
     call config_get_param("vd_px_max", vd_px_max, success)
     call config_get_param("vd_npx", vd_npx, success)
-    
+
     call config_get_param("output_dir", output_dir, success)
     call config_get_param("log_fname", log_fname, success)
     call config_get_param("psi_xt_fname", psi_xt_fname, success)
