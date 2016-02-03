@@ -1,0 +1,44 @@
+! Example input file
+
+! Units
+hbar = 1.0
+
+! Particle parameters
+m = 1.0
+
+! Gaussian parameters
+p0 = 5.0
+x0 = 0.0
+sig_x = 1.0
+
+! Spatial grid parameters
+x_min = -10.0
+x_max = 25.0
+nx = 10000
+
+! Temporal grid parameters
+t_min = 0.0
+t_max = 10.0
+nt = 2000
+
+! Virtual detector grid parameters
+! # of points outside interaction region
+nxl_external = 100
+nxr_external = 100
+! # of virtual detector points
+vd_nxl = 0
+vd_nxr = 20
+
+! Virtual detector binning parameters
+vd_px_min = 0.0
+vd_px_max = 10.0
+vd_npx = 500
+
+! Output parameters
+output_dir = ./output/
+log_fname = run.log
+psi_xt_fname = psi_xt.dat
+vd_px_fname = vd_px.dat
+
+print_mod_x = 50
+print_mod_t = 10

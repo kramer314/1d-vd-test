@@ -1,0 +1,8 @@
+# Copyright (c) 2015 Alex Kramer <kramer.alex.kramer@gmail.com>
+# See the LICENSE.txt file at the top-level directory of this distribution.
+
+Import("env")
+Import("libs")
+Import("lib_path")
+
+env.Program("main.x", source=Glob("*.f90"), LIBS=libs, LIBPATH=lib_path)
