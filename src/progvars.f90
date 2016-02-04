@@ -38,8 +38,8 @@ module progvars
   integer(ip) :: vd_xl_min, vd_xl_max, vd_xr_min, vd_xr_max
 
   ! VD momentum bin parameters
-  real(fp) :: vd_px_min, vd_px_max, vd_dpx
-  integer(ip) :: vd_npx
+  real(fp) :: vd_p_min, vd_p_max, vd_dp
+  integer(ip) :: vd_np
 
   ! Time grid parameters
   real(fp) :: t_min, t_max, dt
@@ -50,13 +50,19 @@ module progvars
   character(:), allocatable :: output_dir
   character(:), allocatable :: log_fname
   character(:), allocatable :: psi_xt_fname
-  character(:), allocatable :: vd_px_fname
+  character(:), allocatable :: vd_p_fname
+
+  ! Residual analysis parameters
+  real(fp) :: resid_p_eps
 
   ! Arrays
   real(fp), allocatable :: x_range(:), t_range(:)
-  real(fp), allocatable :: vd_px_arr(:)
-  real(fp), allocatable :: npx_arr(:)
+  real(fp), allocatable :: vd_p_range(:)
+  real(fp), allocatable :: vd_np_arr(:)
   complex(fp), allocatable :: psi_arr(:)
+
+  real(fp), allocatable :: theor_np_arr(:), resid_np_arr(:)
+  real(fp), allocatable :: resid_np_cum_arr(:)
 
 contains
 
@@ -76,18 +82,25 @@ contains
     allocate(t_range(nt))
     allocate(x_range(nx))
 
-    allocate(vd_px_arr(vd_npx))
-    allocate(npx_arr(vd_npx))
+    allocate(vd_p_range(vd_np))
+    allocate(vd_np_arr(vd_np))
+
+    allocate(theor_np_arr(vd_np))
+    allocate(resid_np_arr(vd_np))
+    allocate(resid_np_cum_arr(vd_np))
   end subroutine progvars_allocate_arrays
 
   subroutine progvars_deallocate_arrays()
-
-    deallocate(vd_px_arr)
-    deallocate(npx_arr)
+    deallocate(vd_p_range)
+    deallocate(vd_np_arr)
 
     deallocate(x_range)
     deallocate(t_range)
     deallocate(psi_arr)
+
+    deallocate(theor_np_arr)
+    deallocate(resid_np_arr)
+    deallocate(resid_np_cum_arr)
   end subroutine progvars_deallocate_arrays
 
   subroutine progvars_set_arrays()
@@ -96,10 +109,10 @@ contains
     call numerics_linspace(x_min, x_max, x_range, dx)
 
     ! Initialize virtual detector grids
-    call numerics_linspace(vd_px_min, vd_px_max, vd_px_arr, vd_dpx)
+    call numerics_linspace(vd_p_min, vd_p_max, vd_p_range, vd_dp)
 
     ! Initialize virtual detector counts
-    npx_arr(:) = 0.0_fp
+    vd_np_arr(:) = 0.0_fp
   end subroutine progvars_set_arrays
 
   subroutine progvars_read_params()
@@ -127,14 +140,14 @@ contains
     call config_get_param("vd_nxl", vd_nxl, success)
     call config_get_param("vd_nxr", vd_nxr, success)
 
-    call config_get_param("vd_px_min", vd_px_min, success)
-    call config_get_param("vd_px_max", vd_px_max, success)
-    call config_get_param("vd_npx", vd_npx, success)
+    call config_get_param("vd_p_min", vd_p_min, success)
+    call config_get_param("vd_p_max", vd_p_max, success)
+    call config_get_param("vd_np", vd_np, success)
 
     call config_get_param("output_dir", output_dir, success)
     call config_get_param("log_fname", log_fname, success)
     call config_get_param("psi_xt_fname", psi_xt_fname, success)
-    call config_get_param("vd_px_fname", vd_px_fname, success)
+    call config_get_param("vd_p_fname", vd_p_fname, success)
 
     call config_get_param("print_mod_x", print_mod_x, success)
     call config_get_param("print_mod_t", print_mod_t, success)
@@ -142,7 +155,7 @@ contains
   end subroutine progvars_read_params
 
   subroutine progvars_deallocate_params()
-    deallocate(vd_px_fname)
+    deallocate(vd_p_fname)
     deallocate(psi_xt_fname)
     deallocate(log_fname)
     deallocate(output_dir)

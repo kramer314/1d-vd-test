@@ -84,7 +84,7 @@ contains
     real(fp), intent(inout) :: np_arr(:)
     real(fp) :: np_norm
 
-    np_norm = numerics_trapz(np_arr, vd_dpx)
+    np_norm = numerics_trapz(np_arr, vd_dp)
     np_arr(:) = np_arr(:) / np_norm
 
   end subroutine vd_normalize
@@ -107,11 +107,9 @@ contains
 
     do i_x = vd_xl_min, vd_xl_max
        call accumulate_counts(i_x, np_arr)
-!       call accumulate_counts(i_x, p_arr, j_arr, np_arr, vd_px_arr, vd_dpx)
     end do
     do i_x = vd_xr_min, vd_xr_max
        call accumulate_counts(i_x, np_arr)
-!       call accumulate_counts_old(i_x, p_arr, j_arr, np_arr, vd_px_arr, vd_dpx)
     end do
 
   contains
@@ -127,12 +125,14 @@ contains
       p_mu = p_arr(i_x)
       ! variance
       p_var = p_var_arr(i_x)
+      ! simulate classical result - delta function
+      !p_var = vd_dp / 100
 
       ! Make Gaussian of variance p_var around p, and populate momentum dist. with that
       scale = dt * abs(j_arr(i_x)) !* vd_dpx * mag_arr(i_x)
 
-      do i_p = 1, vd_npx
-         p = vd_px_arr(i_p)
+      do i_p = 1, vd_np
+         p = vd_p_range(i_p)
          count_arr(i_p) = count_arr(i_p) + scale * dists_gaussian(p, p_mu, p_var)
       end do
 

@@ -23,7 +23,7 @@ module output
   integer(ip), parameter :: output_logfile_unit = logfile_unit
 
   integer(ip), parameter :: psi_xt_unit = 98
-  integer(ip), parameter :: vd_px_unit = 97
+  integer(ip), parameter :: vd_p_unit = 97
 
 contains
   subroutine output_init()
@@ -32,7 +32,7 @@ contains
 
     open(unit=logfile_unit, file=trim(output_dir)//trim(log_fname))
     open(unit=psi_xt_unit, file=trim(output_dir)//trim(psi_xt_fname))
-    open(unit=vd_px_unit, file=trim(output_dir)//trim(vd_px_fname))
+    open(unit=vd_p_unit, file=trim(output_dir)//trim(vd_p_fname))
 
   end subroutine output_init
 
@@ -57,13 +57,15 @@ contains
   end subroutine output_psi_xt
 
   subroutine output_vd_counts()
-    integer(ip) :: i_px
-    real(fp) :: px
+    integer(ip) :: i_p
+    real(fp) :: p
 
     call log_log_info("Writing out VD results", logfile_unit)
-    do i_px = 1, size(npx_arr)
-       px = vd_px_arr(i_px)
-       write(vd_px_unit, *) px, npx_arr(i_px), abs(gaussian_p(px))**2
+    do i_p = 1, size(vd_np_arr)
+       p = vd_p_range(i_p)
+       write(vd_p_unit, *) p, vd_np_arr(i_p), theor_np_arr(i_p), &
+            resid_np_arr(i_p), resid_np_cum_arr(i_p)
     end do
   end subroutine output_vd_counts
+
 end module output

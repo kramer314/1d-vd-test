@@ -8,7 +8,7 @@ module gaussian
   public :: gaussian_cleanup
   public :: gaussian_p
   public :: gaussian_xt
-  
+
   private
 
   ! Useful constants
@@ -16,8 +16,8 @@ module gaussian
   real(fp) :: sig_x2
   real(fp) :: sig_p, sig_p2
   real(fp) :: norm_p
-  complex(fp) :: j_hb, jhb_m  
-  
+  complex(fp) :: j_hb, jhb_m
+
 contains
   subroutine gaussian_init()
 
@@ -33,7 +33,7 @@ contains
     sig_p = hbar / sig_x
     sig_p2 = sig_p**2
 
-    norm_p = sqrt(1.0_fp / (sig_x * sqrt_pi))
+    norm_p = sqrt(1.0_fp / (sig_p * sqrt_pi))
 
   end subroutine gaussian_init
 
@@ -46,7 +46,7 @@ contains
 
     real(fp) :: exp_p
 
-    exp_p = exp(- 0.5_fp * ( (p - p0) / sig_p2 )**2 )
+    exp_p = exp(- 0.5_fp * ( (p - p0) / sig_p )**2 )
 
     val = norm_p * exp_p
   end function gaussian_p
@@ -63,8 +63,8 @@ contains
          ( 2.0_fp * sig_x2 * (1 + jhb_m / sig_x2 * t) )
     exp2 = j_hb * p0 * ( (x - x0) - p0_2m * t )
 
-    val = norm_x * exp(exp1 + exp2)    
-    
+    val = norm_x * exp(exp1 + exp2)
+
   end function gaussian_xt
 
 end module gaussian

@@ -12,8 +12,8 @@ x0 = 0.0
 sig_x = 1.0
 
 ! Spatial grid parameters
-x_min = -10.0
-x_max = 25.0
+x_min = -20.0
+x_max = 20.0
 nx = 10000
 
 ! Temporal grid parameters
@@ -26,19 +26,19 @@ nt = 2000
 nxl_external = 100
 nxr_external = 100
 ! # of virtual detector points
-vd_nxl = 0
-vd_nxr = 10
+vd_nxl = 1
+vd_nxr = 1
 
 ! Virtual detector binning parameters
-vd_px_min = 0.0
-vd_px_max = 10.0
-vd_npx = 500
+vd_p_min = 0.0
+vd_p_max = 10.0
+vd_np = 500
 
 ! Output parameters
 output_dir = ./output/
 log_fname = run.log
 psi_xt_fname = psi_xt.dat
-vd_px_fname = vd_px.dat
+vd_p_fname = vd_px.dat
 
 print_mod_x = 50
 print_mod_t = 10
