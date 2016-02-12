@@ -1,5 +1,7 @@
 module vd
 
+  use ieee_arithmetic
+
   use log, only: log_log_critical, log_stderr
   use numerics, only: numerics_cmplx_phase, numerics_d1, numerics_d2, &
        numerics_trapz
@@ -53,10 +55,11 @@ contains
     end if
 
     ! Calculate edges of VD grid
-    vd_xl_min = nxl_external - vd_nxl
+    ! The +/- 1 terms here are because Fortran uses 1-based arrays
+    vd_xl_min = nxl_external - vd_nxl + 1
     vd_xl_max = nxl_external
     vd_xr_min = nx - nxr_external
-    vd_xr_max = vd_xr_min + vd_nxr
+    vd_xr_max = vd_xr_min + vd_nxr - 1
 
     ! Allocate work arrays
     allocate(phi_arr(nx))
@@ -118,20 +121,24 @@ contains
       integer(ip), intent(in) :: i_x
       real(fp), intent(inout) :: count_arr(:)
 
-      real(fp) :: p, p_mu, p_var
-      real(fp) :: scale
+      ! Semi-classical case uses delta-function histogramming
+      ! We mimic this by using a Gaussian with variation vd_dp / 5, so that
+      ! roughly 100% of the binned distribution will be located at a single
+      ! grid point.
+
+      real(fp) :: p, p_mu, p_var, p_var_sc
+      real(fp) :: scale, g
       integer(ip) :: i_p
       ! mean
       p_mu = p_arr(i_x)
       ! variance
       p_var = p_var_arr(i_x)
 
+      ! semiclassical variance
+      p_var_sc = vd_dp / 16
+
       if (vd_semi_classical) then
-         ! Semi-classical case uses delta-function histogramming
-         ! We mimic this by using a Gaussian with variation vd_dp / 5, so that
-         ! roughly 100% of the binned distribution will be located at a single
-         ! grid point.
-         p_var = vd_dp / 16
+         p_var = p_var_sc
       end if
 
       ! Make Gaussian of variance p_var around p, and populate momentum
@@ -140,7 +147,16 @@ contains
 
       do i_p = 1, vd_np
          p = vd_p_range(i_p)
-         count_arr(i_p) = count_arr(i_p) + scale * dists_gaussian(p, p_mu, p_var)
+         g = dists_gaussian(p, p_mu, p_var)
+
+         if (ieee_is_nan(g)) then
+            ! There are some numerical stability issues with calculating
+            ! p_var = D2[log(rho)] in the quantum case
+            ! If this happens, we revert back to the classical approximation
+            g = dists_gaussian(p, p_mu, vd_dp / 16)
+         end if
+
+         count_arr(i_p) = count_arr(i_p) + scale * g
       end do
 
     end subroutine accumulate_counts
@@ -157,6 +173,10 @@ contains
 
     ! Calculate second moment of local momentum dist.
     ! From Iafrate, G., et al. Journal de Physique 42.C7.10 (1981).
+    ! Note that this is numerically unstable! Right now we check for this and
+    ! revert back to the semi-classical case if this derivative returns a NaN
+    ! but we should look into more using stable derivative methods than
+    ! finite differencing to avoid this.
     call numerics_d2(log(mag_arr(vd_xl_min - 1 : vd_xl_max + 1)), &
          p_var_arr(vd_xl_min - 1 : vd_xl_max + 1), dx)
     call numerics_d2(log(mag_arr(vd_xr_min - 1 : vd_xr_max + 1)), &
