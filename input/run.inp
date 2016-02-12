@@ -42,6 +42,7 @@ output_dir = ./output/
 log_fname = run.log
 psi_xt_fname = psi_xt.dat
 vd_p_fname = vd_px.dat
+vd_pt_fname = vd_pxt.dat
 
 print_mod_x = 50
 print_mod_t = 10

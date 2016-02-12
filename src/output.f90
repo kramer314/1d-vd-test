@@ -15,6 +15,7 @@ module output
 
   public :: output_psi_xt
   public :: output_vd_counts
+  public :: output_vd_t
 
   public :: output_logfile_unit
 
@@ -24,6 +25,7 @@ module output
 
   integer(ip), parameter :: psi_xt_unit = 98
   integer(ip), parameter :: vd_p_unit = 97
+  integer(ip), parameter :: vd_pt_unit = 96
 
 contains
   subroutine output_init()
@@ -33,6 +35,7 @@ contains
     open(unit=logfile_unit, file=trim(output_dir)//trim(log_fname))
     open(unit=psi_xt_unit, file=trim(output_dir)//trim(psi_xt_fname))
     open(unit=vd_p_unit, file=trim(output_dir)//trim(vd_p_fname))
+    open(unit=vd_pt_unit, file=trim(output_dir)//trim(vd_pt_fname))
 
   end subroutine output_init
 
@@ -40,6 +43,8 @@ contains
 
     close(unit=logfile_unit)
     close(unit=psi_xt_unit)
+    close(unit=vd_p_unit)
+    close(unit=vd_pt_unit)
 
   end subroutine output_cleanup
 
@@ -67,5 +72,18 @@ contains
             theor_np_arr(i_p), resid_np_arr(i_p), resid_np_cum_arr(i_p)
     end do
   end subroutine output_vd_counts
+
+  subroutine output_vd_t()
+    integer(ip) :: i_p
+    real(fp) :: p
+
+    call log_log_info("Writing out phi(p; t)", logfile_unit)
+    do i_p = 1, size(vd_np_arr)
+       p = vd_p_range(i_p)
+       write(vd_pt_unit, fp_format, advance="no") vd_np_arr(i_p)
+    end do
+    write(vd_pt_unit, *)
+
+  end subroutine output_vd_t
 
 end module output

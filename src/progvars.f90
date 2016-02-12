@@ -56,6 +56,7 @@ module progvars
   character(:), allocatable :: log_fname
   character(:), allocatable :: psi_xt_fname
   character(:), allocatable :: vd_p_fname
+  character(:), allocatable :: vd_pt_fname
 
   ! Residual analysis parameters
   real(fp) :: resid_p_eps
@@ -155,6 +156,7 @@ contains
     call config_get_param("log_fname", log_fname, success)
     call config_get_param("psi_xt_fname", psi_xt_fname, success)
     call config_get_param("vd_p_fname", vd_p_fname, success)
+    call config_get_param("vd_pt_fname", vd_pt_fname, success)
 
     call config_get_param("print_mod_x", print_mod_x, success)
     call config_get_param("print_mod_t", print_mod_t, success)
