@@ -11,11 +11,10 @@ lib_path= "#deps/fortran-lib/build"
 
 env = DefaultEnvironment(ENV = os.environ, TOOLS = ['default', "gfortran"])
 
-debug_flags = "-Og -g3 -Wall -Wextra -Wconversion -Wunused-parameter -pedantic -fcheck=all -fbacktrace"
-#-ffpe-trap=zero,overflow,underflow
+debug_flags = "-Og -g3 -Wall -Wextra -Wconversion -Wunused-parameter -pedantic -fcheck=all -fbacktrace -fno-unsafe-math-optimizations -frounding-math -fsignaling-nans"
 prod_flags = "-O3 -ffast-math -march=native"
 env.Replace(F90FLAGS = debug_flags)
-env.Replace(F90FLAGS = prod_flags)
+#env.Replace(F90FLAGS = prod_flags)
 env.Replace(FORTRANMODDIRPREFIX = "-J ")
 env.Replace(FORTRANMODDIR = build_dir)
 env.Replace(F90PATH = lib_path)

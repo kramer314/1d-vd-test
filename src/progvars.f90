@@ -1,5 +1,7 @@
 module progvars
-  use globvars, only: dp, dp_format, ip, pi_dp, e_dp, j_dp
+  use ieee_arithmetic
+
+  use globvars, only: dp, dp_format, dp_format_raw, ip, pi_dp, e_dp, j_dp
   use config, only: config_get_param
   use numerics, only: numerics_linspace
 
@@ -8,6 +10,7 @@ module progvars
   ! Real kind parameter / formatting
   integer(ip), parameter :: fp = dp
   character(*), parameter :: fp_format = dp_format
+  character(*), parameter :: fp_format_raw = dp_format_raw
 
   ! Numerical constants
   real(fp), parameter :: pi = real(pi_dp, kind=fp)
@@ -34,6 +37,9 @@ module progvars
   ! left/right number of virtual detector grid points in external grid
   integer(ip) :: vd_nxl, vd_nxr
 
+  ! semi-classical VD switch
+  logical :: vd_semi_classical
+  
   ! Useful VD grid indices
   integer(ip) :: vd_xl_min, vd_xl_max, vd_xr_min, vd_xr_max
 
@@ -143,6 +149,8 @@ contains
     call config_get_param("vd_p_min", vd_p_min, success)
     call config_get_param("vd_p_max", vd_p_max, success)
     call config_get_param("vd_np", vd_np, success)
+
+    call config_get_param("vd_semi_classical", vd_semi_classical, success)
 
     call config_get_param("output_dir", output_dir, success)
     call config_get_param("log_fname", log_fname, success)

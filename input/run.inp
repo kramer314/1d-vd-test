@@ -34,6 +34,9 @@ vd_p_min = 0.0
 vd_p_max = 10.0
 vd_np = 500
 
+! Semiclassical VD binning
+vd_semi_classical = False
+
 ! Output parameters
 output_dir = ./output/
 log_fname = run.log

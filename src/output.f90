@@ -63,8 +63,8 @@ contains
     call log_log_info("Writing out VD results", logfile_unit)
     do i_p = 1, size(vd_np_arr)
        p = vd_p_range(i_p)
-       write(vd_p_unit, *) p, vd_np_arr(i_p), theor_np_arr(i_p), &
-            resid_np_arr(i_p), resid_np_cum_arr(i_p)
+       write(vd_p_unit, "(4"//fp_format_raw//")") p, vd_np_arr(i_p), &
+            theor_np_arr(i_p), resid_np_arr(i_p), resid_np_cum_arr(i_p)
     end do
   end subroutine output_vd_counts
 

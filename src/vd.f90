@@ -31,7 +31,7 @@ contains
     logical :: sane
 
     character(:), allocatable :: error_msg
-
+    
     ! Check internal / external / virtual detector grid limits
 
     sane = .true.
@@ -95,9 +95,9 @@ contains
     real(fp), intent(inout) :: np_arr(:)
 
     call vd_fill_arrays(psi_arr)
-    call vd_calc_pj
+    call vd_calc_pj()
     call vd_bin(np_arr)
-
+    
   end subroutine vd_update
 
   subroutine vd_bin(np_arr)
@@ -125,11 +125,18 @@ contains
       p_mu = p_arr(i_x)
       ! variance
       p_var = p_var_arr(i_x)
-      ! simulate classical result - delta function
-      !p_var = vd_dp / 100
 
-      ! Make Gaussian of variance p_var around p, and populate momentum dist. with that
-      scale = dt * abs(j_arr(i_x)) !* vd_dpx * mag_arr(i_x)
+      if (vd_semi_classical) then
+         ! Semi-classical case uses delta-function histogramming
+         ! We mimic this by using a Gaussian with variation vd_dp / 5, so that
+         ! roughly 100% of the binned distribution will be located at a single
+         ! grid point.
+         p_var = vd_dp / 16
+      end if
+
+      ! Make Gaussian of variance p_var around p, and populate momentum
+      ! distribution using that
+      scale = dt * abs(j_arr(i_x))
 
       do i_p = 1, vd_np
          p = vd_p_range(i_p)
