@@ -31,7 +31,7 @@ contains
     logical :: sane
 
     character(:), allocatable :: error_msg
-    
+
     ! Check internal / external / virtual detector grid limits
 
     sane = .true.
@@ -97,7 +97,7 @@ contains
     call vd_fill_arrays(psi_arr)
     call vd_calc_pj()
     call vd_bin(np_arr)
-    
+
   end subroutine vd_update
 
   subroutine vd_bin(np_arr)

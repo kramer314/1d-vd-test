@@ -35,7 +35,7 @@ vd_p_max = 10.0
 vd_np = 500
 
 ! Semiclassical VD binning
-vd_semi_classical = False
+vd_semi_classical = True
 
 ! Output parameters
 output_dir = ./output/

@@ -1,5 +1,4 @@
 module progvars
-  use ieee_arithmetic
 
   use globvars, only: dp, dp_format, dp_format_raw, ip, pi_dp, e_dp, j_dp
   use config, only: config_get_param
@@ -39,7 +38,7 @@ module progvars
 
   ! semi-classical VD switch
   logical :: vd_semi_classical
-  
+
   ! Useful VD grid indices
   integer(ip) :: vd_xl_min, vd_xl_max, vd_xr_min, vd_xr_max
 

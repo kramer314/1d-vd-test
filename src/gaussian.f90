@@ -20,7 +20,6 @@ module gaussian
 
 contains
   subroutine gaussian_init()
-
     ! Precalculate useful constants
     p0_m = p0 / m
     p0_2m = p0_m / 2.0_fp
