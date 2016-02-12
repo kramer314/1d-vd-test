@@ -51,7 +51,7 @@ contains
             "configuration; exiting abnormally."
        call log_log_critical(error_msg, logfile_unit)
        call log_log_critical(error_msg, log_stderr)
-       call exit(0)
+       stop 0
     end if
 
     ! Calculate edges of VD grid
