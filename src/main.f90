@@ -8,7 +8,7 @@ program main
   use progvars
   use setup, only: setup_init, setup_cleanup
   use output, only: output_psi_xt, output_vd_counts, output_vd_t, &
-       output_logfile_unit
+       output_vd_residuals, output_logfile_unit
   use propagate, only: propagate_psi
   use gaussian, only: gaussian_p
   use vd, only: vd_update, vd_normalize
@@ -32,7 +32,7 @@ program main
      if (mod(i_t, print_mod_t) .eq. 0) then
         call log_log_info("Timestep "//string_val(i_t)//" of "// &
              string_val(nt), logfile_unit)
-        call output_vd_t()
+        ! call output_vd_t()
         ! call output_psi_xt()
      end if
 
@@ -40,6 +40,7 @@ program main
   call log_log_info("Time propagation complete.", logfile_unit)
 
   call vd_normalize(vd_np_arr)
+  call output_vd_counts()
 
   call log_log_info("Constructing residuals.", logfile_unit)
   do i_p = 1, vd_np
@@ -51,8 +52,7 @@ program main
   do i_p = 1, vd_np
      resid_np_cum_arr(i_p) = numerics_trapz(resid_np_arr(1:i_p), vd_dp)
   end do
-
-  call output_vd_counts()
+  call output_vd_residuals()
 
   call setup_cleanup()
 end program main
