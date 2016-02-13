@@ -80,6 +80,7 @@ contains
     deallocate(p_var_arr)
     deallocate(p_arr)
     deallocate(phi_arr)
+
   end subroutine vd_cleanup
 
   subroutine vd_normalize(np_arr)
@@ -148,14 +149,6 @@ contains
       do i_p = 1, vd_np
          p = vd_p_range(i_p)
          g = dists_gaussian(p, p_mu, p_var)
-
-         if (ieee_is_nan(g)) then
-            ! There are some numerical stability issues with calculating
-            ! p_var = D2[log(rho)] in the quantum case
-            ! If this happens, we revert back to the classical approximation
-            g = dists_gaussian(p, p_mu, vd_dp / 16)
-         end if
-
          count_arr(i_p) = count_arr(i_p) + scale * g
       end do
 
@@ -164,6 +157,9 @@ contains
   end subroutine vd_bin
 
   subroutine vd_calc_pj()
+
+    real(fp) :: p_var, eps_fp
+    integer(ip) :: i_x
 
     ! Calculate p_local = d(phi) / dx
     call numerics_d1(phi_arr(vd_xl_min - 1 : vd_xl_max + 1), &
@@ -174,15 +170,43 @@ contains
     ! Calculate second moment of local momentum dist.
     ! From Iafrate, G., et al. Journal de Physique 42.C7.10 (1981).
     ! Note that this is numerically unstable! Right now we check for this and
-    ! revert back to the semi-classical case if this derivative returns a NaN
-    ! but we should look into more using stable derivative methods than
-    ! finite differencing to avoid this.
+    ! manually attempt to correct for this, but if we really want to do this
+    ! correctly, we should look into using more stable derivative methods or
+    ! an alternative variance measure to avoid this issue.
     call numerics_d2(log(mag_arr(vd_xl_min - 1 : vd_xl_max + 1)), &
          p_var_arr(vd_xl_min - 1 : vd_xl_max + 1), dx)
     call numerics_d2(log(mag_arr(vd_xr_min - 1 : vd_xr_max + 1)), &
          p_var_arr(vd_xr_min - 1 : vd_xr_max + 1), dx)
 
     p_var_arr(:) = - hbar**2 / 4.0_fp * p_var_arr(:)
+
+    ! There are cases in which the values of mag_arr are zero (below machine
+    ! precision so that the derivative operation above is completely unstable.
+    ! In these cases, we solve this by setting the variance equal to the
+    ! machine epsilon. This can be justified (in some sense) using L'Hopital's
+    ! rule:
+    !
+    ! d^2/dx^2 log(rho) = 1/rho^2 ( rho * rho'' - rho'^2)
+    !
+    ! If rho <= eps then rho' and rho'' <= rho
+    ! so d^2/dx^2 log(rho) <= eps
+    !
+    ! We also correct for negative variances here, which are almost certainly
+    ! due to numerical accuracy issues.
+    eps_fp = epsilon(1.0_fp)
+    do i_x = vd_xl_min, vd_xl_max
+       p_var = p_var_arr(i_x)
+       if (ieee_is_nan(p_var) .or. (p_var .lt. eps_fp)) then
+          p_var_arr(i_x) = eps_fp
+       end if
+    end do
+
+    do i_x = vd_xr_min, vd_xr_max
+       p_var = p_var_arr(i_x)
+       if (ieee_is_nan(p_var) .or. (p_var .lt. eps_fp)) then
+          p_var_arr(i_x) = eps_fp
+       end if
+    end do
 
     ! Calculate j_local = rho * p_local / m
     j_arr(vd_xl_min : vd_xl_max) = mag_arr(vd_xl_min : vd_xl_max) / m * &
