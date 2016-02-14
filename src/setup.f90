@@ -5,7 +5,6 @@ module setup
   use progvars
   use output, only: output_init, output_cleanup, output_logfile_unit
   use propagate, only: propagate_init, propagate_cleanup
-  use vd, only: vd_init, vd_cleanup
 
   implicit none
 
@@ -40,7 +39,6 @@ contains
     call output_init()
 
     call propagate_init()
-    call vd_init()
 
     call log_log_info("Initialization complete.", logfile_unit)
 
@@ -50,7 +48,6 @@ contains
 
     call log_log_info("Beginning module cleanup / exiting.", logfile_unit)
 
-    call vd_cleanup()
     call propagate_cleanup()
     call output_cleanup()
     call progvars_cleanup()

@@ -1,15 +1,16 @@
 module progvars
+  ! Program variables module
 
-  use globvars, only: dp, dp_format, dp_format_raw, ip, pi_dp, e_dp, j_dp
+  ! Imports -- library dependencies
+  use globvars, only: pi_dp, e_dp, j_dp
   use config, only: config_get_param
   use numerics, only: numerics_linspace
 
-  implicit none
+  ! Imports -- program modules
+  use precision, only: ip, fp, fp_format, fp_format_raw
+  use vd, only: vd_obj
 
-  ! Real kind parameter / formatting
-  integer(ip), parameter :: fp = dp
-  character(*), parameter :: fp_format = dp_format
-  character(*), parameter :: fp_format_raw = dp_format_raw
+  implicit none
 
   ! Numerical constants
   real(fp), parameter :: pi = real(pi_dp, kind=fp)
@@ -30,11 +31,14 @@ module progvars
   real(fp) :: x_min, x_max, dx
   integer(ip) :: nx
 
+  ! Virtual detector object along x spatial grid
+  type(vd_obj) :: vdx
+
   ! Virtual detector parameters
   ! left/right number of grid points outside region of interested
   integer(ip) :: nxl_external, nxr_external
   ! left/right number of virtual detector grid points in external grid
-  integer(ip) :: vd_nxl, vd_nxr
+  integer(ip) :: nxl_vd, nxr_vd
 
   ! semi-classical VD switch
   logical :: vd_semi_classical
@@ -43,7 +47,7 @@ module progvars
   integer(ip) :: vd_xl_min, vd_xl_max, vd_xr_min, vd_xr_max
 
   ! VD momentum bin parameters
-  real(fp) :: vd_p_min, vd_p_max, vd_dp
+  real(fp) :: vd_p_min, vd_p_max
   integer(ip) :: vd_np
 
   ! Time grid parameters
@@ -64,8 +68,6 @@ module progvars
 
   ! Arrays
   real(fp), allocatable :: x_range(:), t_range(:)
-  real(fp), allocatable :: vd_p_range(:)
-  real(fp), allocatable :: vd_np_arr(:)
   complex(fp), allocatable :: psi_arr(:)
 
   real(fp), allocatable :: theor_np_arr(:), resid_np_arr(:)
@@ -77,11 +79,19 @@ contains
     call progvars_read_params()
     call progvars_allocate_arrays()
     call progvars_set_arrays()
+
+    call vdx%init(nx, nxl_external, nxr_external, nxl_vd, nxr_vd, dx, vd_np, &
+         vd_p_min, vd_p_max, dt, vd_semi_classical, hbar, m)
+    vd_xl_min = vdx%xl_min
+    vd_xl_max = vdx%xl_max
+    vd_xr_min = vdx%xr_min
+    vd_xr_max = vdx%xr_max
+
   end subroutine progvars_init
 
   subroutine progvars_cleanup()
+    call vdx%cleanup()
     call progvars_deallocate_arrays()
-    call progvars_deallocate_params()
   end subroutine progvars_cleanup
 
   subroutine progvars_allocate_arrays()
@@ -89,18 +99,12 @@ contains
     allocate(t_range(nt))
     allocate(x_range(nx))
 
-    allocate(vd_p_range(vd_np))
-    allocate(vd_np_arr(vd_np))
-
     allocate(theor_np_arr(vd_np))
     allocate(resid_np_arr(vd_np))
     allocate(resid_np_cum_arr(vd_np))
   end subroutine progvars_allocate_arrays
 
   subroutine progvars_deallocate_arrays()
-    deallocate(vd_p_range)
-    deallocate(vd_np_arr)
-
     deallocate(x_range)
     deallocate(t_range)
     deallocate(psi_arr)
@@ -114,12 +118,6 @@ contains
     ! Initialize numerical grids
     call numerics_linspace(t_min, t_max, t_range, dt)
     call numerics_linspace(x_min, x_max, x_range, dx)
-
-    ! Initialize virtual detector grids
-    call numerics_linspace(vd_p_min, vd_p_max, vd_p_range, vd_dp)
-
-    ! Initialize virtual detector counts
-    vd_np_arr(:) = 0.0_fp
   end subroutine progvars_set_arrays
 
   subroutine progvars_read_params()
@@ -144,8 +142,8 @@ contains
 
     call config_get_param("nxl_external", nxl_external, success)
     call config_get_param("nxr_external", nxr_external, success)
-    call config_get_param("vd_nxl", vd_nxl, success)
-    call config_get_param("vd_nxr", vd_nxr, success)
+    call config_get_param("nxl_vd", nxl_vd, success)
+    call config_get_param("nxr_vd", nxr_vd, success)
 
     call config_get_param("vd_p_min", vd_p_min, success)
     call config_get_param("vd_p_max", vd_p_max, success)
@@ -164,12 +162,5 @@ contains
     call config_get_param("print_mod_t", print_mod_t, success)
 
   end subroutine progvars_read_params
-
-  subroutine progvars_deallocate_params()
-    deallocate(vd_p_fname)
-    deallocate(psi_xt_fname)
-    deallocate(log_fname)
-    deallocate(output_dir)
-  end subroutine progvars_deallocate_params
 
 end module progvars

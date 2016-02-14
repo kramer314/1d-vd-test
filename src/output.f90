@@ -1,8 +1,11 @@
 module output
+  ! Output module
 
+  ! Imports -- library dependencies
   use files, only: files_ensure_dir
   use log, only: log_log_info
 
+  ! Imports -- program modules
   use progvars
   use gaussian, only: gaussian_p
 
@@ -31,6 +34,7 @@ module output
 
 contains
   subroutine output_init()
+    ! Initialize output module, including opening output files
 
     call files_ensure_dir(output_dir)
 
@@ -43,6 +47,7 @@ contains
   end subroutine output_init
 
   subroutine output_cleanup()
+    ! Cleanup output module, including closing output files
 
     close(unit=logfile_unit)
     close(unit=psi_xt_unit)
@@ -53,6 +58,7 @@ contains
   end subroutine output_cleanup
 
   subroutine output_psi_xt()
+    ! Output time-dependent wavefunction psi(x,t)
     integer(ip) :: i_x
 
     call log_log_info("Writing out psi(x,t)", logfile_unit)
@@ -66,36 +72,41 @@ contains
   end subroutine output_psi_xt
 
   subroutine output_vd_counts()
+    ! Output virtual detector momentum-binning counts
     integer(ip) :: i_p
     real(fp) :: p
 
-    call log_log_info("Writing out VD results", logfile_unit)
-    do i_p = 1, size(vd_np_arr)
-       p = vd_p_range(i_p)
-       write(vd_p_unit, "(2"//fp_format_raw//")") p, vd_np_arr(i_p)
+    call log_log_info("Writing out VD counts", logfile_unit)
+
+    do i_p = 1, size(vdx%vd_p_arr)
+       p = vdx%p_range(i_p)
+       write(vd_p_unit, "(2"//fp_format_raw//")") p, vdx%vd_p_arr(i_p)
     end do
+
   end subroutine output_vd_counts
 
   subroutine output_vd_residuals()
+    ! Output virtual detector residual comparisons
     integer(ip) :: i_p
     real(fp) :: p
 
     call log_log_info("Writing out VD residuals", logfile_unit)
-    do i_p = 1, size(vd_np_arr)
-       p = vd_p_range(i_p)
+    do i_p = 1, size(vdx%p_range)
+       p = vdx%p_range(i_p)
        write(vd_resid_unit, "(4"//fp_format_raw//")") p, theor_np_arr(i_p), &
             resid_np_arr(i_p), resid_np_cum_arr(i_p)
     end do
   end subroutine output_vd_residuals
 
   subroutine output_vd_t()
+    ! Output time-dependent virual detector counts
     integer(ip) :: i_p
     real(fp) :: p
 
     call log_log_info("Writing out phi(p; t)", logfile_unit)
-    do i_p = 1, size(vd_np_arr)
-       p = vd_p_range(i_p)
-       write(vd_pt_unit, fp_format, advance="no") vd_np_arr(i_p)
+    do i_p = 1, size(vdx%p_range)
+       p = vdx%p_range(i_p)
+       write(vd_pt_unit, fp_format, advance="no") vdx%vd_p_arr(i_p)
     end do
     write(vd_pt_unit, *)
 
