@@ -1,5 +1,5 @@
-module setup
-  use config, only: config_init, config_cleanup, config_get_param
+omodule setup
+  use config, only: config_init, config_cleanup
   use log, only: log_log_info, log_stdout
 
   use progvars

@@ -23,7 +23,7 @@ module output
 
   public :: output_logfile_unit
 
-  ! Output file unit numers
+  ! Output file unit numbers
   integer(ip), parameter :: logfile_unit = 99
   integer(ip), parameter :: output_logfile_unit = logfile_unit
 
