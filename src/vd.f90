@@ -1,5 +1,15 @@
 module vd
-  ! Virtual detector module
+  ! One-dimensional virtual detector module.
+  !
+  ! This module exposes one type: vd_obj, which encapsulates virtual
+  ! detection functionality along some one-dimensional numerical grid. For
+  ! multi-dimensional calculations, separate objects corresponding to each
+  ! direction should be used.
+  !
+  ! It is assumed that you have some module named `precision` that this can
+  ! link to, which defines the integer variables `ip` and `fp` that specify
+  ! the integer and real floating point kind parameters to be used in this
+  ! module.
 
   ! Imports -- intrinsic
   use ieee_arithmetic
@@ -19,25 +29,35 @@ module vd
 
   public :: vd_obj
   type vd_obj
-     ! Virtual detector object
+     ! One-dimensional virtual detector object
+
+     ! Virtual detector result; array of momentum "counts"
+     real(fp), allocatable :: vd_p_arr(:)
+
+     ! Semi-classical method flag
      logical :: semi_classical
 
+     ! Spatial grid parameters
      real(fp) :: dx
      integer(ip) :: nxl, nxr
      integer(ip) :: xl_min, xl_max
      integer(ip) :: xr_min, xr_max
 
+     ! Momentum grid parameters
      integer(ip) :: np
      real(fp) :: p_min, p_max
      real(fp) :: dp
+     ! Momentum grid
      real(fp), allocatable :: p_range(:)
-     real(fp), allocatable :: vd_p_arr(:)
 
+     ! Temporal grid / integration parameters
      real(fp) :: dt
 
+     ! Units and particle parameters
      real(fp) :: hbar
      real(fp) :: m
 
+     ! Internal work arrays
      real(fp), allocatable :: phi_arr_l(:), phi_arr_r(:)
      real(fp), allocatable :: p_arr_l(:), p_arr_r(:)
      real(fp), allocatable :: p_var_arr_l(:), p_var_arr_r(:)
@@ -45,19 +65,35 @@ module vd
      real(fp), allocatable :: j_arr_l(:), j_arr_r(:)
 
    contains
+     ! Internal pointers exposing private module procedures
      procedure :: init => vd_init
      procedure :: cleanup => vd_cleanup
      procedure :: normalize => vd_normalize
      procedure :: update => vd_update
-     procedure :: bin => vd_bin
-     procedure :: fill_arrays => vd_fill_arrays
   end type vd_obj
 
 contains
 
   subroutine vd_init(this, nx, nxl_ext, nxr_ext, nxl_vd, nxr_vd, dx, np, &
        p_min, p_max, dt, sc, hbar, m)
-    ! Initialize VD object
+    ! Initialize virtual detector object
+    !
+    ! This method is publicly exposed as `this%init`
+    !
+    ! this :: vd_obj instance
+    ! nx :: number of spatial grid points
+    ! nxl_ext :: number of left external region grid points
+    ! nxr_ext :: number of right external region grid points
+    ! nxl_vd :: number of left virtual detector points
+    ! nxr_vd :: number of right virtual detector poitns
+    ! dx :: spatial grid step
+    ! np :: number of momentum grid points
+    ! p_min :: lower momentum grid boundary
+    ! p_max :: upper momentum grid boundary
+    ! dt :: integration / temporal grid time step
+    ! sc :: semi-classical flag
+    ! hbar :: hbar units
+    ! m :: particle mass
     class(vd_obj), intent(inout) :: this
     integer(ip), intent(in) :: nx
     integer(ip), intent(in) :: nxl_ext
@@ -73,26 +109,11 @@ contains
     real(fp), intent(in) :: hbar
     real(fp), intent(in) :: m
 
-    logical :: sane
-    character(:), allocatable :: error_msg
-
     ! Validate spatial grid parameters
-    sane = (nx .gt. nxl_ext + nxr_ext + nxl_vd + nxr_vd)
-    if (.not. sane) then
-       error_msg = "Error in numerical grid; stopping abnormally"
-       call log_log_critical(error_msg, log_stderr)
-       deallocate(error_msg)
-       stop 0
-    end if
+    call vd_validate_spatial_input(nx, nxl_ext, nxr_ext, nxl_vd, nxr_vd)
 
     ! Validate momentum grid parameters
-    sane = (p_min .lt. p_max)
-    if (.not. sane) then
-       error_msg = "Error in momentum grid; stopping abnormally"
-       call log_log_critical(error_msg, log_stderr)
-       deallocate(error_msg)
-       stop 0
-    end if
+    call vd_validate_momentum_input(p_min, p_max)
 
     ! Assign VD scalar parameters
     this%dx = dx
@@ -101,7 +122,9 @@ contains
 
     this%np = np
     this%p_min = p_min
-    this%p_min = p_max
+    this%p_max = p_max
+
+    write(*,*) p_min, p_max
 
     this%dt = dt
 
@@ -109,12 +132,6 @@ contains
 
     this%hbar = hbar
     this%m = m
-
-    ! Allocate and construct VD counts and momentum grid
-    allocate(this%vd_p_arr(np))
-    this%vd_p_arr(:) = 0.0_fp
-    allocate(this%p_range(np))
-    call numerics_linspace(p_min, p_max, this%p_range, this%dp)
 
     ! Calculate VD grid edge indices on the total spatial grid
     ! Because Fortran arrays are by default 1-indexed, we have to be careful
@@ -124,21 +141,16 @@ contains
     this%xr_max = nx - nxr_ext
     this%xr_min = this%xr_max - nxr_vd + 1
 
-    ! Allocate internal work arrays, including the points on the sides of the
-    ! detectors (because we need to compute derivatives).
-    ! These are 0-based so that the virtual detector points start at index 1,
-    ! which aligns with Fortran's default array indexing.
-    allocate(this%phi_arr_l(0 : nxl_vd + 1), this%phi_arr_r(0 : nxr_vd + 1))
-    allocate(this%p_arr_l(0 : nxl_vd + 1), this%p_arr_r(0 : nxr_vd + 1))
-    allocate(this%p_var_arr_l(0 : nxl_vd + 1), &
-         this%p_var_arr_r(0 : nxr_vd + 1))
-    allocate(this%mag_arr_l(0 : nxl_vd + 1), this%mag_arr_r(0 : nxr_vd + 1))
-    allocate(this%j_arr_l(0 : nxl_vd + 1), this%j_arr_r(0 : nxr_vd + 1))
+    call vd_setup_arrays(this)
 
   end subroutine vd_init
 
   subroutine vd_cleanup(this)
-    ! Deallocate all object arrays
+    ! Deallocate all object arrays of a virtual detector object
+    !
+    ! This method is publicly exposed as `this%cleanup`
+    !
+    ! this :: vd_obj instance
     class(vd_obj), intent(inout) :: this
 
     deallocate(this%phi_arr_l, this%phi_arr_r)
@@ -152,6 +164,10 @@ contains
 
   subroutine vd_normalize(this)
     ! Normalize virtual detector spectrum
+    !
+    ! This method is publicly exposed as `this%normalize`
+    !
+    ! this :: vd_obj instance
     class(vd_obj), intent(inout) :: this
 
     real(fp) :: np_norm
@@ -162,6 +178,10 @@ contains
 
   subroutine vd_bin(this)
     ! Update virtual detector counts
+    !
+    ! This method is not publicly exposed, and is only called by `vd_update`
+    !
+    ! this :: vd_obj instance
     class(vd_obj), intent(inout) :: this
 
     integer(ip) :: i_x_vd
@@ -183,7 +203,8 @@ contains
     subroutine accumulate_counts(i_x_vd, p_arr, p_var_arr, j_arr)
       ! Method that actually updates virtual detector counts
       !
-      ! i_x :: spatial grid index
+      ! i_x_vd :: spatial grid index *with respect to the other arguments*, not
+      !   the overall spatial grid
       ! p_arr :: local momentum array, indexed by i_x
       ! p_var_arr :: local variance array, indexed by i_x
       ! j_arr :: local current array, indexed by i_x
@@ -236,19 +257,26 @@ contains
   subroutine vd_update(this, psi_arr)
     ! Update virtual detector counts
     !
+    ! This method is publicly exposed as `this%update`
+    !
     ! this :: vd_obj instance
     ! psi_arr :: 1D slice of wavefunction along the same grid as vd_obj
-    !
-    ! For multi-dimensional propagations, this routine should be called for
-    ! each slice along the grid of vd_obj
     class(vd_obj), intent(inout) :: this
     complex(fp), intent(in) :: psi_arr(:)
 
-    call this%fill_arrays(psi_arr)
-    call this%bin()
+    call vd_fill_arrays(this, psi_arr)
+    call vd_bin(this)
+    ! call this%fill_arrays(psi_arr)
+    ! call this%bin()
   end subroutine vd_update
 
   subroutine vd_fill_arrays(this, psi_arr)
+    ! Fill VD work arrays in preparation for binning
+    !
+    ! This method is not publicly exposed, and is only called by `vd_update`
+    !
+    ! this :: vd_obj instance
+    ! psi_arr :: 1D slice of wavefunction along the same grid as vd_obj
     class(vd_obj), intent(inout) :: this
     complex(fp), intent(in) :: psi_arr(:)
 
@@ -324,5 +352,102 @@ contains
     end do
 
   end subroutine vd_fill_arrays
+
+  subroutine vd_setup_arrays(this)
+    ! Allocate and initialize all virtual detector arrays
+    !
+    ! This method is not publicly exposed, and is only called by `vd_init`
+    !
+    ! this :: vd_obj instance
+    class(vd_obj), intent(inout) :: this
+
+    allocate(this%vd_p_arr(this%np))
+    this%vd_p_arr(:) = 0.0_fp
+    allocate(this%p_range(this%np))
+    call numerics_linspace(this%p_min, this%p_max, this%p_range, this%dp)
+
+    ! Allocate internal work arrays, including the points on the sides of the
+    ! detectors (because we need to compute derivatives).
+    ! These are 0-based so that the virtual detector points start at index 1,
+    ! which aligns with Fortran's default array indexing.
+    allocate(this%phi_arr_l(0 : this%nxl + 1), &
+         this%phi_arr_r(0 : this%nxr + 1))
+    allocate(this%p_arr_l(0 : this%nxl + 1), this%p_arr_r(0 : this%nxr + 1))
+    allocate(this%p_var_arr_l(0 : this%nxl + 1), &
+         this%p_var_arr_r(0 : this%nxr + 1))
+    allocate(this%mag_arr_l(0 : this%nxl + 1), &
+         this%mag_arr_r(0 : this%nxr + 1))
+    allocate(this%j_arr_l(0 : this%nxl + 1), this%j_arr_r(0 : this%nxr + 1))
+
+  end subroutine vd_setup_arrays
+
+  subroutine vd_validate_spatial_input(nx, nxl_ext, nxr_ext, nxl_vd, nxr_vd)
+    ! Validate spatial grid setup and exit abnormally if errors are found
+    !
+    ! This method is not publicly exposed, and is only called by `vd_init`
+    !
+    ! nx :: number of spatial grid points
+    ! nxl_ext :: number of left external grid points
+    ! nxr_ext :: number of right external grid points
+    ! nxl_vd :: number of left virtual detector points
+    ! nxr_vd :: number of right virtuald detector points
+    integer(ip) :: nx
+    integer(ip) :: nxl_ext
+    integer(ip) :: nxr_ext
+    integer(ip) :: nxl_vd
+    integer(ip) :: nxr_vd
+
+    logical :: sane
+    character(:), allocatable :: error_msg
+
+    write(*,*) nx, nxl_ext, nxr_ext, nxl_vd, nxr_vd
+
+    sane = (nxl_ext .gt. 0) .and. (nxr_ext .gt. 0)
+    if (.not. sane) then
+       error_msg = "No external region defined in numerical grid; "// &
+            "stopping abnormally."
+       call log_log_critical(error_msg, log_stderr)
+       stop 0
+    end if
+
+    sane = (nxl_vd .gt. 0) .and. (nxr_vd .gt. 0)
+    if (.not. sane) then
+       error_msg = "Virtual detectors must be present in numerical grid; "// &
+            "stopping abnormally."
+       write(*,*) nxl_vd, nxr_vd
+       call log_log_critical(error_msg, log_stderr)
+       stop 0
+    end if
+
+    sane = (nx .gt. nxl_ext + nxr_ext + nxl_vd + nxr_vd)
+    if (.not. sane) then
+       error_msg = "Numerical grid size greater than number of allocated "// &
+            "points; no internal region possible; exiting abnormally."
+       call log_log_critical(error_msg, log_stderr)
+       stop 0
+    end if
+
+  end subroutine vd_validate_spatial_input
+
+  subroutine vd_validate_momentum_input(p_min, p_max)
+    ! Validate momentum grid setup and exit abnormally if issues are found
+    !
+    ! This method is not publicly exposed, and is only called by `vd_init`
+    !
+    ! p_min :: lower momentum grid bound
+    ! p_max :: upper momentum grid bound
+    real(fp) :: p_min
+    real(fp) :: p_max
+
+    logical :: sane
+    character(:), allocatable :: error_msg
+
+    sane = (p_min .lt. p_max)
+    if (.not. sane) then
+       error_msg = "Incoherent momentum grid boundaries; exiting abnormally."
+       call log_log_critical(error_msg, log_stderr)
+       stop 0
+    end if
+  end subroutine vd_validate_momentum_input
 
 end module vd
