@@ -124,8 +124,6 @@ contains
     this%p_min = p_min
     this%p_max = p_max
 
-    write(*,*) p_min, p_max
-
     this%dt = dt
 
     this%semi_classical = sc
@@ -338,7 +336,7 @@ contains
     end do
 
     call numerics_d1(this%phi_arr_r(:), this%p_arr_r(:), this%dx)
-    this%j_arr_r(:) = this%mag_arr_r / this%m * this%p_arr_r(:)
+    this%j_arr_r(:) = this%mag_arr_r(:) / this%m * this%p_arr_r(:)
 
     call numerics_d2(log(this%mag_arr_r(:)), this%p_var_arr_r(:), &
          this%dx)
@@ -400,8 +398,6 @@ contains
     logical :: sane
     character(:), allocatable :: error_msg
 
-    write(*,*) nx, nxl_ext, nxr_ext, nxl_vd, nxr_vd
-
     sane = (nxl_ext .gt. 0) .and. (nxr_ext .gt. 0)
     if (.not. sane) then
        error_msg = "No external region defined in numerical grid; "// &
@@ -414,7 +410,6 @@ contains
     if (.not. sane) then
        error_msg = "Virtual detectors must be present in numerical grid; "// &
             "stopping abnormally."
-       write(*,*) nxl_vd, nxr_vd
        call log_log_critical(error_msg, log_stderr)
        stop 0
     end if
