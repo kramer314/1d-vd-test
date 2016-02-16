@@ -56,6 +56,8 @@ module progvars
 
   ! Output parameters
   integer(ip) :: print_mod_x, print_mod_t
+  logical :: write_out_psi_xt, write_out_vd_pt
+
   character(:), allocatable :: output_dir
   character(:), allocatable :: log_fname
   character(:), allocatable :: psi_xt_fname
@@ -160,6 +162,9 @@ contains
 
     call config_get_param("print_mod_x", print_mod_x, success)
     call config_get_param("print_mod_t", print_mod_t, success)
+
+    call config_get_param("write_out_vd_pt", write_out_vd_pt, success)
+    call config_get_param("write_out_psi_xt", write_out_psi_xt, success)
 
   end subroutine progvars_read_params
 

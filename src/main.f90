@@ -11,7 +11,7 @@ program main
   use progvars
   use setup, only: setup_init, setup_cleanup
   use output, only: output_psi_xt, output_vd_counts, output_vd_residuals, &
-       output_vd_t, logfile_unit=>output_logfile_unit
+       output_vd_pt, logfile_unit=>output_logfile_unit
   use propagate, only: propagate_psi
   use gaussian, only: gaussian_p
 
@@ -33,8 +33,15 @@ program main
      if (mod(i_t, print_mod_t) .eq. 0) then
         call log_log_info("Timestep "//string_val(i_t)//" of "// &
              string_val(nt), logfile_unit)
-        call output_vd_t()
-        call output_psi_xt()
+
+        if (write_out_vd_pt) then
+           call output_vd_pt()
+        end if
+
+        if (write_out_psi_xt) then
+           call output_psi_xt()
+        end if
+
      end if
 
   end do
