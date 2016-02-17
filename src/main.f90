@@ -12,7 +12,7 @@ program main
        output_vd_residual_analysis, output_vd_pt, &
        logfile_unit=>output_logfile_unit
   use propagate, only: propagate_psi
-  use resids, only: resids_calculate, resids_analyze
+  use resids, only: resids_calculate, resids_stats
 
   implicit none
 
@@ -46,9 +46,8 @@ program main
   call vdx%normalize()
   call output_vd_counts()
 
-  call resids_calculate
-  call resids_analyze(resid_mean, resid_var, resid_fivenum_arr, &
-       resid_mean_sq_err, resid_mean_abs_err)
+  call resids_calculate()
+  call resids_stats()
 
   call output_vd_residuals()
   call output_vd_residual_analysis()

@@ -16,7 +16,7 @@ module resids
   private
 
   public :: resids_calculate
-  public :: resids_analyze
+  public :: resids_stats
 
 contains
 
@@ -41,22 +41,16 @@ contains
 
   end subroutine resids_calculate
 
-  subroutine resids_analyze(mean, var, fivenum_arr, mean_sq_err, mean_abs_err)
-    real(fp), intent(inout) :: mean
-    real(fp), intent(inout) :: var
-    real(fp), intent(inout) :: fivenum_arr(5)
-    real(fp), intent(inout) :: mean_sq_err
-    real(fp), intent(inout) :: mean_abs_err
+  subroutine resids_stats()
+    call log_log_info("Generating statistical summary of residuals.", logfile_unit)
 
-    call log_log_info("Analyzing residuals.", logfile_unit)
+    resid_mean = stats_mean(resid_np_arr, mask=resid_np_mask)
+    resid_var = stats_variance(resid_np_arr, mask=resid_np_mask)
 
-    mean = stats_mean(resid_np_arr, mask=resid_np_mask)
-    var = stats_variance(resid_np_arr, mask=resid_np_mask)
-    
-    call stats_fivenum(resid_np_arr, fivenum_arr, mask=resid_np_mask)
-    mean_sq_err = stats_mean_sq_err(resid_np_arr, mask=resid_np_mask)
-    mean_abs_err = stats_mean_abs_err(resid_np_arr, mask=resid_np_mask)
-    
-  end subroutine resids_analyze
+    call stats_fivenum(resid_np_arr, resid_fivenum_arr, mask=resid_np_mask)
+    resid_mean_sq_err = stats_mean_sq_err(resid_np_arr, mask=resid_np_mask)
+    resid_mean_abs_err = stats_mean_abs_err(resid_np_arr, mask=resid_np_mask)
+
+  end subroutine resids_stats
 
 end module resids
