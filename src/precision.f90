@@ -1,7 +1,7 @@
 module precision
 
   use globvars, only: dp, dp_format, dp_format_raw, sp, sp_format, &
-       sp_format_raw, ip
+       sp_format_raw, ip, ip_format, ip_format_raw
 
   implicit none
 

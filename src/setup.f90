@@ -1,4 +1,4 @@
-omodule setup
+module setup
   use config, only: config_init, config_cleanup
   use log, only: log_log_info, log_stdout
 

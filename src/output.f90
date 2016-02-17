@@ -19,6 +19,7 @@ module output
   public :: output_psi_xt
   public :: output_vd_counts
   public :: output_vd_residuals
+  public :: output_vd_residual_analysis
   public :: output_vd_pt
 
   public :: output_logfile_unit
@@ -30,7 +31,9 @@ module output
   integer(ip), parameter :: psi_xt_unit = 98
   integer(ip), parameter :: vd_p_unit = 97
   integer(ip), parameter :: vd_resid_unit = 96
-  integer(ip), parameter :: vd_pt_unit = 95
+  integer(ip), parameter :: vd_resid_analysis_unit = 95
+  integer(ip), parameter :: vd_pt_unit = 94
+
 
 contains
   subroutine output_init()
@@ -41,6 +44,8 @@ contains
     open(unit=logfile_unit, file=trim(output_dir)//trim(log_fname))
     open(unit=vd_p_unit, file=trim(output_dir)//trim(vd_p_fname))
     open(unit=vd_resid_unit, file=trim(output_dir)//trim(vd_resid_fname))
+    open(unit=vd_resid_analysis_unit, file=trim(output_dir)//&
+         trim(vd_resid_analysis_fname))
 
     if (write_out_vd_pt) then
        open(unit=vd_pt_unit, file=trim(output_dir)//trim(vd_pt_fname))
@@ -60,6 +65,7 @@ contains
     close(unit=vd_p_unit)
     close(unit=vd_pt_unit)
     close(unit=vd_resid_unit)
+    close(unit=vd_resid_analysis_unit)
 
   end subroutine output_cleanup
 
@@ -110,6 +116,53 @@ contains
             resid_np_arr(i_p), resid_np_cum_arr(i_p)
     end do
   end subroutine output_vd_residuals
+
+  subroutine output_vd_residual_analysis()
+    ! Output residual statistical analysis
+
+    integer(ip), parameter :: out_unit = vd_resid_analysis_unit
+
+    character(*), parameter :: char_format = "(A)"
+
+    write(out_unit, char_format) "Virtual detector residual statistical analysis"
+    write(out_unit, char_format) "Format: [Label] [value]"
+    write(out_unit, *)
+
+    write(out_unit, char_format, advance="no") "Residual threshold: "
+    write(out_unit, fp_format) resid_p_eps
+
+    write(out_unit, char_format, advance="no") "Number of above-threshold residuals "// &
+         "used in analysis: "
+    write(out_unit, ip_format) count(resid_np_mask)
+
+    write(out_unit, char_format, advance="no") "Min residual value: "
+    write(out_unit, fp_format) resid_fivenum_arr(1)
+
+    write(out_unit, char_format, advance="no") "Max residual value: "
+    write(out_unit, fp_format) resid_fivenum_arr(5)
+
+    write(out_unit, char_format, advance="no") "Mean residual value: "
+    write(out_unit, fp_format) resid_mean
+
+    write(out_unit, char_format, advance="no") "Median residual value: "
+    write(out_unit, fp_format) resid_fivenum_arr(3)
+
+    write(out_unit, char_format, advance="no") "Residual variance: "
+    write(out_unit, fp_format) resid_var
+
+    write(out_unit, char_format, advance="no") "Lower quartile residual value: "
+    write(out_unit, fp_format) resid_fivenum_arr(2)
+
+    write(out_unit, char_format, advance="no") "Upper quartile residual value: "
+    write(out_unit, fp_format) resid_fivenum_arr(4)
+
+    write(out_unit, char_format, advance="no") "Mean absolute residual error: "
+    write(out_unit, fp_format) resid_mean_abs_err
+
+    write(out_unit, char_format, advance="no") "Mean squared residual error: "
+    write(out_unit, fp_format) resid_mean_sq_err
+
+  end subroutine output_vd_residual_analysis
 
   subroutine output_vd_pt()
     ! Output time-dependent virual detector counts

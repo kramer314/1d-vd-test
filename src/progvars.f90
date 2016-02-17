@@ -7,7 +7,7 @@ module progvars
   use numerics, only: numerics_linspace
 
   ! Imports -- program modules
-  use precision, only: ip, fp, fp_format, fp_format_raw
+  use precision
   use vd, only: vd_obj
 
   implicit none
@@ -63,10 +63,16 @@ module progvars
   character(:), allocatable :: psi_xt_fname
   character(:), allocatable :: vd_p_fname
   character(:), allocatable :: vd_resid_fname
+  character(:), allocatable :: vd_resid_analysis_fname
   character(:), allocatable :: vd_pt_fname
 
   ! Residual analysis parameters
   real(fp) :: resid_p_eps
+
+  ! Residual analysis variables
+  real(fp) :: resid_mean, resid_var
+  real(fp) :: resid_mean_sq_err, resid_mean_abs_err
+  real(fp) :: resid_fivenum_arr(5)
 
   ! Arrays
   real(fp), allocatable :: x_range(:), t_range(:)
@@ -74,6 +80,7 @@ module progvars
 
   real(fp), allocatable :: theor_np_arr(:), resid_np_arr(:)
   real(fp), allocatable :: resid_np_cum_arr(:)
+  logical, allocatable :: resid_np_mask(:)
 
 contains
 
@@ -104,6 +111,7 @@ contains
     allocate(theor_np_arr(vd_np))
     allocate(resid_np_arr(vd_np))
     allocate(resid_np_cum_arr(vd_np))
+    allocate(resid_np_mask(vd_np))
   end subroutine progvars_allocate_arrays
 
   subroutine progvars_deallocate_arrays()
@@ -114,6 +122,7 @@ contains
     deallocate(theor_np_arr)
     deallocate(resid_np_arr)
     deallocate(resid_np_cum_arr)
+    deallocate(resid_np_mask)
   end subroutine progvars_deallocate_arrays
 
   subroutine progvars_set_arrays()
@@ -153,11 +162,15 @@ contains
 
     call config_get_param("vd_semi_classical", vd_semi_classical, success)
 
+    call config_get_param("resid_p_eps", resid_p_eps, success)
+
     call config_get_param("output_dir", output_dir, success)
     call config_get_param("log_fname", log_fname, success)
     call config_get_param("psi_xt_fname", psi_xt_fname, success)
     call config_get_param("vd_p_fname", vd_p_fname, success)
     call config_get_param("vd_resid_fname", vd_resid_fname, success)
+    call config_get_param("vd_resid_analysis_fname", vd_resid_analysis_fname, &
+         success)
     call config_get_param("vd_pt_fname", vd_pt_fname, success)
 
     call config_get_param("print_mod_x", print_mod_x, success)

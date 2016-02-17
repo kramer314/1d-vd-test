@@ -37,12 +37,16 @@ vd_np = 500
 ! Semiclassical VD binning
 vd_semi_classical = True
 
+! Residual analysis parameters
+resid_p_eps = 1.0E-6
+
 ! Output parameters
 output_dir = ./output/
 log_fname = run.log
 psi_xt_fname = psi_xt.dat
 vd_p_fname = vd_px.dat
 vd_resid_fname = vd_resid.dat
+vd_resid_analysis_fname = vd_resid_analysis.txt
 vd_pt_fname = vd_pxt.dat
 
 print_mod_x = 50
