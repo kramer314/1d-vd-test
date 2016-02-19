@@ -6,8 +6,8 @@ module precision
   implicit none
 
   ! Real precision kind parameter / formatting
-  integer(ip), parameter :: fp = sp
-  character(*), parameter :: fp_format = sp_format
-  character(*), parameter :: fp_format_raw = sp_format_raw
+  integer(ip), parameter :: fp = dp
+  character(*), parameter :: fp_format = dp_format
+  character(*), parameter :: fp_format_raw = dp_format_raw
   
 end module precision
