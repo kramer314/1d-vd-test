@@ -2,7 +2,6 @@ module output
   ! Output module
 
   ! Imports -- library dependencies
-  use files, only: files_ensure_dir
   use log, only: log_log_info, log_log_critical, log_stderr
 
   ! Imports -- program modules
@@ -38,8 +37,6 @@ module output
 contains
   subroutine output_init()
     ! Initialize output module, including opening output files
-
-    call files_ensure_dir(output_dir)
 
     open(unit=logfile_unit, file=trim(output_dir)//trim(log_fname))
     open(unit=vd_p_unit, file=trim(output_dir)//trim(vd_p_fname))
@@ -128,6 +125,9 @@ contains
     write(out_unit, char_format) "Format: [Label] [value]"
     write(out_unit, *)
 
+    write(out_unit, char_format, advance="no") "Cumulative residuals: "
+    write(out_unit, fp_format) resid_np_cum_arr(vd_np)
+
     write(out_unit, char_format, advance="no") "Residual threshold: "
     write(out_unit, fp_format) resid_p_eps
 
@@ -161,6 +161,8 @@ contains
 
     write(out_unit, char_format, advance="no") "Mean squared residual error: "
     write(out_unit, fp_format) resid_mean_sq_err
+
+    write(out_unit, *)
 
   end subroutine output_vd_residual_analysis
 

@@ -17,7 +17,7 @@ module vd
   ! Imports -- library dependencies
   use log, only: log_log_critical, log_stderr
   use numerics, only: numerics_cmplx_phase, numerics_d1, numerics_d2, &
-       numerics_trapz, numerics_linspace
+       numerics_linspace
   use dists, only: dists_gaussian
 
   ! Imports -- program variables
@@ -68,7 +68,6 @@ module vd
      ! Internal pointers exposing private module procedures
      procedure :: init => vd_init
      procedure :: cleanup => vd_cleanup
-     procedure :: normalize => vd_normalize
      procedure :: update => vd_update
   end type vd_obj
 
@@ -160,20 +159,6 @@ contains
     deallocate(this%vd_p_arr)
   end subroutine vd_cleanup
 
-  subroutine vd_normalize(this)
-    ! Normalize virtual detector spectrum
-    !
-    ! This method is publicly exposed as `this%normalize`
-    !
-    ! this :: vd_obj instance
-    class(vd_obj), intent(inout) :: this
-
-    real(fp) :: np_norm
-
-    np_norm = numerics_trapz(this%vd_p_arr, this%dp)
-    this%vd_p_arr(:) = this%vd_p_arr(:) / np_norm
-  end subroutine vd_normalize
-
   subroutine vd_bin(this)
     ! Update virtual detector counts
     !
@@ -212,7 +197,6 @@ contains
       real(fp), intent(in) :: j_arr(:)
 
       integer(ip) :: i_p
-      integer(ip) :: i_p_sc
 
       real(fp) :: p
       real(fp) :: p_mu
@@ -226,27 +210,27 @@ contains
       ! momentum variance
       p_var = p_var_arr(i_x_vd)
 
-      ! semi-classical adjustments
-      ! The semi-classical case uses delta-function histogramming, which we
-      ! mimic by using a Gaussian with variance dp/4 so that roughly 100% of
-      ! the binned distribution will be located at a single grid point.
-      if (this%semi_classical) then
-         ! shift p_mu to be at the nearest grid point
-         i_p_sc = nint( (p_mu - this%p_min) / this%dp )
-         p_mu = this%p_min + this%dp * i_p_sc
-
-         p_var = this%dp / 16
-      end if
-
       scale = this%dt * abs(j_arr(i_x_vd))
 
-      ! Make gaussian of variance p_var around p_mu, and population momentum
-      ! distribution using that.
-      do i_p = 1, this%np
-         p = this%p_range(i_p)
-         g = dists_gaussian(p, p_mu, p_var)
-         this%vd_p_arr(i_p) = this%vd_p_arr(i_p) + scale * g
-      end do
+      ! The semi-classical case uses delta-function histogramming
+      if (this%semi_classical) then
+         ! shift p_mu to be at the nearest grid point.
+         i_p = nint( (p_mu - this%p_min) / this%dp )
+
+         if (i_p .ge. 1 .and. i_p .le. this%np) then
+            ! divide scale by dp here so delta-distribution is normalized
+            this%vd_p_arr(i_p) = this%vd_p_arr(i_p) + scale / this%dp
+         end if
+
+      else
+         ! Make gaussian of variance p_var around p_mu, and population momentum
+         ! distribution using that.
+         do i_p = 1, this%np
+            p = this%p_range(i_p)
+            g = dists_gaussian(p, p_mu, p_var)
+            this%vd_p_arr(i_p) = this%vd_p_arr(i_p) + scale * g
+         end do
+      end if
 
     end subroutine accumulate_counts
 

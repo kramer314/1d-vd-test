@@ -1,5 +1,6 @@
 module setup
   use config, only: config_init, config_cleanup
+  use files, only: files_ensure_dir
   use log, only: log_log_info, log_stdout
 
   use progvars
@@ -29,6 +30,7 @@ contains
     call progvars_init()
 
     ! Copy input file to output directory
+    call files_ensure_dir(output_dir)
     cmd_to_exec = "cp "//trim(input_fname)//" "//trim(output_dir)
     call log_log_info("Copying config/input file to output directory: "// &
          cmd_to_exec, log_stdout)
