@@ -17,7 +17,7 @@ module vd
   ! Imports -- library dependencies
   use log, only: log_log_critical, log_stderr
   use numerics, only: numerics_cmplx_phase, numerics_d1, numerics_d2, &
-       numerics_linspace
+       numerics_linspace, numerics_trapz
   use dists, only: dists_gaussian
 
   ! Imports -- program variables
@@ -67,6 +67,7 @@ module vd
    contains
      ! Internal pointers exposing private module procedures
      procedure :: init => vd_init
+     procedure :: finalize => vd_finalize
      procedure :: cleanup => vd_cleanup
      procedure :: update => vd_update
   end type vd_obj
@@ -141,6 +142,19 @@ contains
     call vd_setup_arrays(this)
 
   end subroutine vd_init
+
+  subroutine vd_finalize(this)
+    ! Take care of normalization, etc., accounting for numerical error
+    ! Note that the VD method itself is normalized, but numerical error means
+    ! this normalization is only up to a number of decimal places proportional
+    ! to the grid step. Here, we force the final spectrum to be normalized.
+    class(vd_obj), intent(inout) :: this
+
+    real(fp) :: norm
+
+    norm = numerics_trapz(this%vd_p_arr, this%dp)
+    this%vd_p_arr(:) = this%vd_p_arr(:) / norm
+  end subroutine vd_finalize
 
   subroutine vd_cleanup(this)
     ! Deallocate all object arrays of a virtual detector object

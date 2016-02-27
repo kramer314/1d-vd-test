@@ -43,6 +43,7 @@ program main
   end do
   call log_log_info("Time propagation complete.", logfile_unit)
 
+  call vdx%finalize()
   call output_vd_counts()
 
   call resids_calculate()
