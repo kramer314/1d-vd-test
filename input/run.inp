@@ -51,3 +51,6 @@ vd_pt_fname = vd_pxt.dat
 
 print_mod_x = 50
 print_mod_t = 10
+
+write_out_vd_pt = False
+write_out_psi_xt = False
