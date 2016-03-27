@@ -8,7 +8,7 @@ module progvars
 
   ! Imports -- program modules
   use precision
-  use vd, only: vd_obj
+  use vd_1d, only: vd_1d_manager
 
   implicit none
 
@@ -32,7 +32,7 @@ module progvars
   integer(ip) :: nx
 
   ! Virtual detector object along x spatial grid
-  type(vd_obj) :: vdx
+  type(vd_1d_manager) :: vdx
 
   ! Virtual detector parameters
   ! left/right number of grid points outside region of interested

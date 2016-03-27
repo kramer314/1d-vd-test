@@ -1,310 +1,100 @@
 module vd
-  ! One-dimensional virtual detector module.
-  !
-  ! This module exposes one type: vd_obj, which encapsulates virtual
-  ! detection functionality along some one-dimensional numerical grid. For
-  ! multi-dimensional calculations, separate objects corresponding to each
-  ! direction should be used.
-  !
-  ! It is assumed that you have some module named `precision` that this can
-  ! link to, which defines the integer variables `ip` and `fp` that specify
-  ! the integer and real floating point kind parameters to be used in this
-  ! module.
 
-  ! Imports -- intrinsic
   use ieee_arithmetic
 
-  ! Imports -- library dependencies
+  use numerics, only: numerics_cmplx_phase, numerics_d1, numerics_d2
   use log, only: log_log_critical, log_stderr
-  use numerics, only: numerics_cmplx_phase, numerics_d1, numerics_d2, &
-       numerics_linspace, numerics_trapz
-  use dists, only: dists_gaussian
 
-  ! Imports -- program variables
   use precision, only: ip, fp
 
   implicit none
 
   private
 
-  public :: vd_obj
-  type vd_obj
-     ! One-dimensional virtual detector object
-
-     ! Virtual detector result; array of momentum "counts"
-     real(fp), allocatable :: vd_p_arr(:)
-
-     ! Semi-classical method flag
-     logical :: semi_classical
-
-     ! Spatial grid parameters
-     real(fp) :: dx
-     integer(ip) :: nxl, nxr
-     integer(ip) :: xl_min, xl_max
-     integer(ip) :: xr_min, xr_max
-
-     ! Momentum grid parameters
-     integer(ip) :: np
-     real(fp) :: p_min, p_max
-     real(fp) :: dp
-     ! Momentum grid
-     real(fp), allocatable :: p_range(:)
-
-     ! Temporal grid / integration parameters
-     real(fp) :: dt
-
-     ! Units and particle parameters
-     real(fp) :: hbar
-     real(fp) :: m
-
-     ! Internal work arrays
-     real(fp), allocatable :: phi_arr_l(:), phi_arr_r(:)
-     real(fp), allocatable :: p_arr_l(:), p_arr_r(:)
-     real(fp), allocatable :: p_var_arr_l(:), p_var_arr_r(:)
-     real(fp), allocatable :: mag_arr_l(:), mag_arr_r(:)
-     real(fp), allocatable :: j_arr_l(:), j_arr_r(:)
-
-   contains
-     ! Internal pointers exposing private module procedures
-     procedure :: init => vd_init
-     procedure :: finalize => vd_finalize
-     procedure :: cleanup => vd_cleanup
-     procedure :: update => vd_update
-  end type vd_obj
+  public :: vd_get_local_quantities
+  public :: vd_get_indices
 
 contains
 
-  subroutine vd_init(this, nx, nxl_ext, nxr_ext, nxl_vd, nxr_vd, dx, np, &
-       p_min, p_max, dt, sc, hbar, m)
-    ! Initialize virtual detector object
+  subroutine vd_get_indices(nx, nxl_ext, nxr_ext, nxl_vd, nxr_vd, xl_min, &
+       xl_max, xr_max, xr_min)
+    ! Get VD indices relative to total spatial grid
     !
-    ! This method is publicly exposed as `this%init`
+    ! This method also checks whether the external and VD region sizes are
+    ! coherent, and stops with an error if not.
     !
-    ! this :: vd_obj instance
-    ! nx :: number of spatial grid points
-    ! nxl_ext :: number of left external region grid points
-    ! nxr_ext :: number of right external region grid points
-    ! nxl_vd :: number of left virtual detector points
-    ! nxr_vd :: number of right virtual detector poitns
-    ! dx :: spatial grid step
-    ! np :: number of momentum grid points
-    ! p_min :: lower momentum grid boundary
-    ! p_max :: upper momentum grid boundary
-    ! dt :: integration / temporal grid time step
-    ! sc :: semi-classical flag
-    ! hbar :: hbar units
-    ! m :: particle mass
-    class(vd_obj), intent(inout) :: this
-    integer(ip), intent(in) :: nx
-    integer(ip), intent(in) :: nxl_ext
-    integer(ip), intent(in) :: nxr_ext
-    integer(ip), intent(in) :: nxl_vd
-    integer(ip), intent(in) :: nxr_vd
-    real(fp), intent(in) :: dx
-    integer(ip), intent(in) :: np
-    real(fp), intent(in) :: p_min
-    real(fp), intent(in) :: p_max
-    real(fp), intent(in) :: dt
-    logical, intent(in) :: sc
-    real(fp), intent(in) :: hbar
-    real(fp), intent(in) :: m
+    ! nx :: spatial grid size
+    ! nxl_ext :: number of left external points
+    ! nxr_ext :: number of right external points
+    ! nxl_vd :: number of left VD points
+    ! nxr_vd :: number of right VD points
+    ! xl_min :: left VD minimum index (returned value)
+    ! xl_max :: left VD maximum index (returned value)
+    ! xr_min :: right VD minimum index (returned value)
+    ! xr_max :: right VD maximum index (returned value)
+    integer, intent(in) :: nx
+    integer, intent(in) :: nxl_vd, nxl_ext
+    integer, intent(in) :: nxr_vd, nxr_ext
+    integer, intent(out) :: xl_min, xl_max
+    integer, intent(out) :: xr_min, xr_max
 
-    ! Validate spatial grid parameters
+    ! Make sure external and VD region sizes make sense
     call vd_validate_spatial_input(nx, nxl_ext, nxr_ext, nxl_vd, nxr_vd)
 
-    ! Validate momentum grid parameters
-    call vd_validate_momentum_input(p_min, p_max)
+    xl_min = nxl_ext + 1
+    xl_max = nxl_ext + nxl_vd
+    xr_max = nx - nxr_ext
+    xr_min = xr_max - nxr_vd + 1
 
-    ! Assign VD scalar parameters
-    this%dx = dx
-    this%nxl = nxl_vd
-    this%nxr = nxr_vd
+  end subroutine vd_get_indices
 
-    this%np = np
-    this%p_min = p_min
-    this%p_max = p_max
-
-    this%dt = dt
-
-    this%semi_classical = sc
-
-    this%hbar = hbar
-    this%m = m
-
-    ! Calculate VD grid edge indices on the total spatial grid
-    ! Because Fortran arrays are by default 1-indexed, we have to be careful
-    ! here.
-    this%xl_min = nxl_ext + 1
-    this%xl_max = nxl_ext + nxl_vd
-    this%xr_max = nx - nxr_ext
-    this%xr_min = this%xr_max - nxr_vd + 1
-
-    call vd_setup_arrays(this)
-
-  end subroutine vd_init
-
-  subroutine vd_finalize(this)
-    ! Take care of normalization, etc., accounting for numerical error
-    ! Note that the VD method itself is normalized, but numerical error means
-    ! this normalization is only up to a number of decimal places proportional
-    ! to the grid step. Here, we force the final spectrum to be normalized.
-    class(vd_obj), intent(inout) :: this
-
-    real(fp) :: norm
-
-    norm = numerics_trapz(this%vd_p_arr, this%dp)
-    this%vd_p_arr(:) = this%vd_p_arr(:) / norm
-  end subroutine vd_finalize
-
-  subroutine vd_cleanup(this)
-    ! Deallocate all object arrays of a virtual detector object
+  subroutine vd_get_local_quantities(psi_arr, dx, m, hbar, p_mu, p_var, j)
+    ! Get local p_mu, p_var, j quantities
     !
-    ! This method is publicly exposed as `this%cleanup`
-    !
-    ! this :: vd_obj instance
-    class(vd_obj), intent(inout) :: this
+    ! psi_arr :: 3-element slice of wavefunction surround the virtual detector,
+    !   in the desired spatial component direction. We require three elements
+    !   because we use three-point finite differencing for derivatives.
+    ! dx :: spatial component grid step
+    ! m :: mass
+    ! hbar :: units
+    ! p_mu :: local component momentum value (to be returned)
+    ! p_var :: local component momentum variance (to be returned)
+    ! j :: local component flux (to be returned)
+    complex(fp), intent(in) :: psi_arr(3)
+    real(fp), intent(in) :: dx
+    real(fp), intent(in) :: m
+    real(fp), intent(in) :: hbar
+    real(fp), intent(inout) :: p_mu
+    real(fp), intent(inout) :: p_var
+    real(fp), intent(inout) :: j
 
-    deallocate(this%phi_arr_l, this%phi_arr_r)
-    deallocate(this%p_arr_l, this%p_arr_r)
-    deallocate(this%p_var_arr_l, this%p_var_arr_r)
-    deallocate(this%mag_arr_l, this%mag_arr_r)
-    deallocate(this%j_arr_l, this%j_arr_r)
-
-    deallocate(this%vd_p_arr)
-  end subroutine vd_cleanup
-
-  subroutine vd_bin(this)
-    ! Update virtual detector counts
-    !
-    ! This method is not publicly exposed, and is only called by `vd_update`
-    !
-    ! this :: vd_obj instance
-    class(vd_obj), intent(inout) :: this
-
-    integer(ip) :: i_x_vd
-
-    ! Accumulate counts along left virtual detector grid
-    do i_x_vd = 1, this%nxl
-       call accumulate_counts(i_x_vd, this%p_arr_l, this%p_var_arr_l, &
-            this%j_arr_l)
-    end do
-
-    ! Accumulate counts along right virtual detector grid
-    do i_x_vd = 1, this%nxr
-       call accumulate_counts(i_x_vd, this%p_arr_r, this%p_var_arr_r, &
-            this%j_arr_r)
-    end do
-
-  contains
-
-    subroutine accumulate_counts(i_x_vd, p_arr, p_var_arr, j_arr)
-      ! Method that actually updates virtual detector counts
-      !
-      ! i_x_vd :: spatial grid index *with respect to the other arguments*, not
-      !   the overall spatial grid
-      ! p_arr :: local momentum array, indexed by i_x
-      ! p_var_arr :: local variance array, indexed by i_x
-      ! j_arr :: local current array, indexed by i_x
-      integer(ip), intent(in) :: i_x_vd
-      real(fp), intent(in) :: p_arr(:)
-      real(fp), intent(in) :: p_var_arr(:)
-      real(fp), intent(in) :: j_arr(:)
-
-      integer(ip) :: i_p
-
-      real(fp) :: p
-      real(fp) :: p_mu
-      real(fp) :: p_var
-
-      real(fp) :: scale
-      real(fp) :: g
-
-      ! mean momentum
-      p_mu = p_arr(i_x_vd)
-      ! momentum variance
-      p_var = p_var_arr(i_x_vd)
-
-      scale = this%dt * abs(j_arr(i_x_vd))
-
-      ! The semi-classical case uses delta-function histogramming
-      if (this%semi_classical) then
-         ! shift p_mu to be at the nearest grid point.
-         i_p = nint( (p_mu - this%p_min) / this%dp )
-
-         if (i_p .ge. 1 .and. i_p .le. this%np) then
-            ! divide scale by dp here so delta-distribution is normalized
-            this%vd_p_arr(i_p) = this%vd_p_arr(i_p) + scale / this%dp
-         end if
-
-      else
-         ! Make gaussian of variance p_var around p_mu, and population momentum
-         ! distribution using that.
-         do i_p = 1, this%np
-            p = this%p_range(i_p)
-            g = dists_gaussian(p, p_mu, p_var)
-            this%vd_p_arr(i_p) = this%vd_p_arr(i_p) + scale * g
-         end do
-      end if
-
-    end subroutine accumulate_counts
-
-  end subroutine vd_bin
-
-  subroutine vd_update(this, psi_arr)
-    ! Update virtual detector counts
-    !
-    ! This method is publicly exposed as `this%update`
-    !
-    ! this :: vd_obj instance
-    ! psi_arr :: 1D slice of wavefunction along the same grid as vd_obj
-    class(vd_obj), intent(inout) :: this
-    complex(fp), intent(in) :: psi_arr(:)
-
-    call vd_fill_arrays(this, psi_arr)
-    call vd_bin(this)
-    ! call this%fill_arrays(psi_arr)
-    ! call this%bin()
-  end subroutine vd_update
-
-  subroutine vd_fill_arrays(this, psi_arr)
-    ! Fill VD work arrays in preparation for binning
-    !
-    ! This method is not publicly exposed, and is only called by `vd_update`
-    !
-    ! this :: vd_obj instance
-    ! psi_arr :: 1D slice of wavefunction along the same grid as vd_obj
-    class(vd_obj), intent(inout) :: this
-    complex(fp), intent(in) :: psi_arr(:)
+    real(fp) :: eps_fp
 
     integer(ip) :: i_x
-    integer(ip) :: i_x_vd
+
+    real(fp) :: phi_arr(3), mag_arr(3), p_arr(3), p_var_arr(3)
     complex(fp) :: z
-    real(fp) :: eps_fp
-    real(fp) :: p_var
 
     eps_fp = epsilon(1.0_fp)
 
-    ! left side of VD grid
-    do i_x = this%xl_min - 1, this%xl_max + 1
-       ! i_x indexes the total spatial grid; we need to convert this to the
-       ! internal grids we use.
-       i_x_vd = i_x - (this%xl_min - 1)
-
+    do i_x = 1, 3
        z = psi_arr(i_x)
-       this%phi_arr_l(i_x_vd) = numerics_cmplx_phase(z) * this%hbar
-       this%mag_arr_l(i_x_vd) = abs(z)**2
+       phi_arr(i_x) = numerics_cmplx_phase(z) * hbar
+       mag_arr(i_x) = abs(z)**2
     end do
 
-    call numerics_d1(this%phi_arr_l(:), this%p_arr_l(:), this%dx)
-    this%j_arr_l(:) = this%mag_arr_l(:) / this%m * this%p_arr_l(:)
+    ! Get local (mean) momentum
+    call numerics_d1(phi_arr, p_arr, dx)
 
-    ! Calculate variance of local momentum distribution.
-    ! Note that this is numerically unstable! Right now, we check for this and
-    ! manually attempt to correct for it, but we should think about finding
-    ! more stable methods to calculate this or find some alternative measure of
-    ! variance.
-    call numerics_d2(log(this%mag_arr_l(:)), this%p_var_arr_l(:), this%dx)
-    this%p_var_arr_l(:) = -this%hbar**2 / 4.0_fp * this%p_var_arr_l(:)
+    p_mu = p_arr(2)
+
+    ! Get local current
+    j = mag_arr(2) / m * p_mu
+
+    ! Calculate local momentum variance
+    ! Note that this is numerically unstable!
+    call numerics_d2(log(mag_arr), p_var_arr, dx)
+    p_var = - hbar**2 / 4.0_fp * p_var_arr(2)
 
     ! There are cases in which the values of mag_arr are less than machine
     ! precision so that the derivative operation above is completely
@@ -317,70 +107,14 @@ contains
     ! If rho <= eps locally then rho' and rho'' <= rho, so
     ! d^2/dx^2 log(rho) <= eps, which means we can't have a better estimate
     ! than setting p_var to be the machine epsilon.
-    do i_x_vd = 0, this%nxl + 1
-       p_var = this%p_var_arr_l(i_x_vd)
-       if (ieee_is_nan(p_var) .or. (p_var .lt. eps_fp)) then
-          this%p_var_arr_l(i_x_vd) = eps_fp
-       end if
-    end do
+    if (ieee_is_nan(p_var) .or. (p_var .lt. eps_fp)) then
+       p_var = eps_fp
+    end if
 
-    ! right side of VD grid -- same procedure as the left side above
-    do i_x = this%xr_min - 1, this%xr_max + 1
-       i_x_vd = i_x - (this%xr_min - 1)
-
-       z = psi_arr(i_x)
-       this%phi_arr_r(i_x_vd) = numerics_cmplx_phase(z) * this%hbar
-       this%mag_arr_r(i_x_vd) = abs(z)**2
-    end do
-
-    call numerics_d1(this%phi_arr_r(:), this%p_arr_r(:), this%dx)
-    this%j_arr_r(:) = this%mag_arr_r(:) / this%m * this%p_arr_r(:)
-
-    call numerics_d2(log(this%mag_arr_r(:)), this%p_var_arr_r(:), &
-         this%dx)
-    this%p_var_arr_r(:) = -this%hbar**2 / 4.0_fp * this%p_var_arr_r(:)
-
-    do i_x_vd = 0, this%nxr + 1
-       p_var = this%p_var_arr_r(i_x_vd)
-       if (ieee_is_nan(p_var) .or. (p_var .lt. eps_fp)) then
-          this%p_var_arr_r(i_x_vd) = eps_fp
-       end if
-    end do
-
-  end subroutine vd_fill_arrays
-
-  subroutine vd_setup_arrays(this)
-    ! Allocate and initialize all virtual detector arrays
-    !
-    ! This method is not publicly exposed, and is only called by `vd_init`
-    !
-    ! this :: vd_obj instance
-    class(vd_obj), intent(inout) :: this
-
-    allocate(this%vd_p_arr(this%np))
-    this%vd_p_arr(:) = 0.0_fp
-    allocate(this%p_range(this%np))
-    call numerics_linspace(this%p_min, this%p_max, this%p_range, this%dp)
-
-    ! Allocate internal work arrays, including the points on the sides of the
-    ! detectors (because we need to compute derivatives).
-    ! These are 0-based so that the virtual detector points start at index 1,
-    ! which aligns with Fortran's default array indexing.
-    allocate(this%phi_arr_l(0 : this%nxl + 1), &
-         this%phi_arr_r(0 : this%nxr + 1))
-    allocate(this%p_arr_l(0 : this%nxl + 1), this%p_arr_r(0 : this%nxr + 1))
-    allocate(this%p_var_arr_l(0 : this%nxl + 1), &
-         this%p_var_arr_r(0 : this%nxr + 1))
-    allocate(this%mag_arr_l(0 : this%nxl + 1), &
-         this%mag_arr_r(0 : this%nxr + 1))
-    allocate(this%j_arr_l(0 : this%nxl + 1), this%j_arr_r(0 : this%nxr + 1))
-
-  end subroutine vd_setup_arrays
+  end subroutine vd_get_local_quantities
 
   subroutine vd_validate_spatial_input(nx, nxl_ext, nxr_ext, nxl_vd, nxr_vd)
     ! Validate spatial grid setup and exit abnormally if errors are found
-    !
-    ! This method is not publicly exposed, and is only called by `vd_init`
     !
     ! nx :: number of spatial grid points
     ! nxl_ext :: number of left external grid points
@@ -422,25 +156,4 @@ contains
 
   end subroutine vd_validate_spatial_input
 
-  subroutine vd_validate_momentum_input(p_min, p_max)
-    ! Validate momentum grid setup and exit abnormally if issues are found
-    !
-    ! This method is not publicly exposed, and is only called by `vd_init`
-    !
-    ! p_min :: lower momentum grid bound
-    ! p_max :: upper momentum grid bound
-    real(fp) :: p_min
-    real(fp) :: p_max
-
-    logical :: sane
-    character(:), allocatable :: error_msg
-
-    sane = (p_min .lt. p_max)
-    if (.not. sane) then
-       error_msg = "Incoherent momentum grid boundaries; exiting abnormally."
-       call log_log_critical(error_msg, log_stderr)
-       stop 0
-    end if
-  end subroutine vd_validate_momentum_input
-
-end module vd
+end  module vd
