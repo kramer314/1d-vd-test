@@ -13,9 +13,8 @@ module vd_1d
   type vd_1d_obj
      ! 1-dimensional VD point
 
-     ! Array of momentum counts
-     ! We need to use pointers here because allocatable arrays can't be used
-     ! within derived types
+     ! Array of momentum counts; we have to use pointers here because
+     ! allocatable arrays can't be used within derived types
      real(fp), pointer :: vd_p_arr(:)
 
      ! Total probability flux through virtual detector
@@ -31,8 +30,10 @@ module vd_1d
      integer(ip) :: np
      real(fp) :: p_min, p_max
      real(fp) :: dp
-     ! We need to use pointers here because allocatable arrays can't be used
-     ! within derived types
+
+     ! Pointer to momentum grid (owned by vd_1d_manager); we have to use
+     ! pointers here because allocatable arrays can't be used within derived
+     ! types
      real(fp), pointer :: p_range(:)
 
      ! Temporal grid step
@@ -77,7 +78,11 @@ module vd_1d
      integer(ip) :: np
      real(fp) :: p_min, p_max
      real(fp) :: dp
-     real(fp), allocatable :: p_range(:)
+
+     ! Momentum grid; we use an allocatable pointer here since the VD objects
+     ! this class managers need this array as well, but we don't want to
+     ! allocate a new array for each VD object.
+     real(fp), pointer :: p_range(:)
 
      ! Temporal grid step
      real(fp) :: dt
@@ -174,12 +179,14 @@ contains
     ! Initialize individual VD objects
     do i_x = 1, this%nxl
        call this%vdl_arr(i_x)%init(this%dx, this%np, this%p_min, this%p_max, &
-            this%dt, this%semi_classical, this%hbar, this%m)
+            this%dp, this%p_range, this%dt, this%semi_classical, &
+            this%hbar, this%m)
     end do
 
     do i_x = 1, this%nxr
        call this%vdr_arr(i_x)%init(this%dx, this%np, this%p_min, this%p_max, &
-            this%dt, this%semi_classical, this%hbar, this%m)
+            this%dp, this%p_range, this%dt, this%semi_classical, &
+            this%hbar, this%m)
     end do
   end subroutine vd_1d_manager_init
 
@@ -224,11 +231,17 @@ contains
     do i_x = 1, this%nxl
        call this%vdl_arr(i_x)%cleanup()
     end do
+    deallocate(this%vdl_arr)
 
     ! Cleanup right VDs
     do i_x = 1, this%nxr
        call this%vdr_arr(i_x)%cleanup()
     end do
+    deallocate(this%vdr_arr)
+
+    deallocate(this%p_range)
+    deallocate(this%vd_p_arr)
+
   end subroutine vd_1d_manager_cleanup
 
   subroutine vd_1d_manager_finalize(this)
@@ -271,7 +284,8 @@ contains
 
   end subroutine vd_1d_manager_finalize
 
-  subroutine vd_1d_obj_init(this, dx, np, p_min, p_max, dt, sc, hbar, m)
+  subroutine vd_1d_obj_init(this, dx, np, p_min, p_max, dp, p_range, dt, sc, &
+       hbar, m)
     ! Initialize virtual detector object.
     !
     ! This method is publicly exposed as vd_obj%init
@@ -281,6 +295,7 @@ contains
     ! np :: number of momentum grid points
     ! p_min :: lower momentum grid boundary
     ! p_max :: upper momentum grid boundary
+    ! p_min :: pointer array referenced to momentum grid
     ! dt :: temporal grid step
     ! sc :: semi-classical flag
     ! hbar :: units
@@ -290,6 +305,8 @@ contains
     integer(ip), intent(in) :: np
     real(fp), intent(in) :: p_min
     real(fp), intent(in) :: p_max
+    real(fp), intent(in) :: dp
+    real(fp), pointer, intent(in) :: p_range(:)
     real(fp), intent(in) :: dt
     logical, intent(in) :: sc
     real(fp), intent(in) :: hbar
@@ -300,6 +317,9 @@ contains
     this%np = np
     this%p_min = p_min
     this%p_max = p_max
+    this%dp = dp
+
+    this%p_range => p_range
 
     this%dt = dt
 
@@ -310,9 +330,6 @@ contains
 
     allocate(this%vd_p_arr(this%np))
     this%vd_p_arr(:) = 0.0_fp
-
-    allocate(this%p_range(this%np))
-    call numerics_linspace(this%p_min, this%p_max, this%p_range, this%dp)
 
     this%net_flux = 0.0_fp
   end subroutine vd_1d_obj_init
@@ -325,8 +342,12 @@ contains
     ! this :: vd_1d_obj instance
     class(vd_1d_obj), intent(inout) :: this
 
-    deallocate(this%p_range)
+    ! Since this%p_range points to an array managed by the VD manager, we can't
+    ! deallocate it here. Instead, we just dereference the pointer.
+    nullify(this%p_range)
+
     deallocate(this%vd_p_arr)
+
   end subroutine vd_1d_obj_cleanup
 
   subroutine vd_1d_obj_update(this, psi_arr)
@@ -374,7 +395,7 @@ contains
        end do
     end if
 
-    this%net_flux = this%net_flux + abs(j)
+    this%net_flux = this%net_flux + scale
 
   end subroutine vd_1d_obj_update
 

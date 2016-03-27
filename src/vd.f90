@@ -17,7 +17,7 @@ module vd
 contains
 
   subroutine vd_get_indices(nx, nxl_ext, nxr_ext, nxl_vd, nxr_vd, xl_min, &
-       xl_max, xr_max, xr_min)
+       xl_max, xr_min, xr_max)
     ! Get VD indices relative to total spatial grid
     !
     ! This method also checks whether the external and VD region sizes are
@@ -41,10 +41,11 @@ contains
     ! Make sure external and VD region sizes make sense
     call vd_validate_spatial_input(nx, nxl_ext, nxr_ext, nxl_vd, nxr_vd)
 
+    ! We have to be careful here, since Fortran arrays are 1-indexed
     xl_min = nxl_ext + 1
     xl_max = nxl_ext + nxl_vd
     xr_max = nx - nxr_ext
-    xr_min = xr_max - nxr_vd + 1
+    xr_min = xr_max - (nxr_vd - 1)
 
   end subroutine vd_get_indices
 
