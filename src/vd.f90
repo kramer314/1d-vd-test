@@ -13,6 +13,7 @@ module vd
 
   public :: vd_get_local_quantities
   public :: vd_get_indices
+  public :: vd_validate_quantum_update
 
 contains
 
@@ -156,5 +157,32 @@ contains
     end if
 
   end subroutine vd_validate_spatial_input
+
+  subroutine vd_validate_quantum_update(i_p_min, i_p_max, np, valid)
+    integer(ip), intent(inout) :: i_p_min, i_p_max
+    integer(ip), intent(in) :: np
+    logical, intent(inout) :: valid
+
+    valid = .true.
+
+    ! If p_min > this%p_max or p_max < this%p_min we don't do anything
+    if ( (i_p_min .eq. 0_ip) .or. (i_p_max .eq. -1_ip) ) then
+
+       valid = .false.
+
+    else
+
+       ! If p_mmin < this%p_min, we start at this%p_min
+       if (i_p_min .eq. -1_ip) then
+          i_p_min = 1_ip
+       end if
+
+       ! If p_max > this%p_max, we end at this%p_max
+       if (i_p_max .eq. 0_ip) then
+          i_p_max = np
+       end if
+
+    end if
+  end subroutine vd_validate_quantum_update
 
 end  module vd

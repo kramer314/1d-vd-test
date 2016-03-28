@@ -50,6 +50,9 @@ module progvars
   real(fp) :: vd_p_min, vd_p_max
   integer(ip) :: vd_np
 
+  ! Number of standard deviations to include in quantum VD binning
+  integer(ip) :: vd_np_stdev
+
   ! Time grid parameters
   real(fp) :: t_min, t_max, dt
   integer(ip) :: nt
@@ -90,7 +93,8 @@ contains
     call progvars_set_arrays()
 
     call vdx%init(nx, nxl_external, nxr_external, nxl_vd, nxr_vd, dx, vd_np, &
-         vd_p_min, vd_p_max, dt, vd_semi_classical, hbar, m)
+         vd_p_min, vd_p_max, dt, vd_semi_classical, hbar, m, &
+         vd_np_stdev=vd_np_stdev)
     vd_xl_min = vdx%xl_min
     vd_xl_max = vdx%xl_max
     vd_xr_min = vdx%xr_min
@@ -159,6 +163,8 @@ contains
     call config_get_param("vd_p_min", vd_p_min, success)
     call config_get_param("vd_p_max", vd_p_max, success)
     call config_get_param("vd_np", vd_np, success)
+
+    call config_get_param("vd_np_stdev", vd_np_stdev, success)
 
     call config_get_param("vd_semi_classical", vd_semi_classical, success)
 

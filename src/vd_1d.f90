@@ -1,9 +1,11 @@
 module vd_1d
-  use numerics, only: numerics_linspace, numerics_trapz
+  use numerics, only: numerics_linspace, numerics_linspace_index, &
+       numerics_trapz
   use dists, only: dists_gaussian
   use precision, only: ip, fp
 
-  use vd, only: vd_get_local_quantities, vd_get_indices
+  use vd, only: vd_get_local_quantities, vd_get_indices, &
+       vd_validate_quantum_update
 
   implicit none
 
@@ -22,6 +24,8 @@ module vd_1d
 
      ! Semi-classical binning flag
      logical :: semi_classical
+     ! Number of standard deviations to include in quantum VD binning
+     integer(ip) :: vd_np_stdev
 
      ! Spatial grid step
      real(fp) :: dx
@@ -62,6 +66,8 @@ module vd_1d
 
      ! Semi-classical binning flag
      logical :: semi_classical
+     ! Number of standard deviations to include in quantum VD binning
+     integer(ip) :: vd_np_stdev
 
      ! Number of left / right virtual detector points
      integer(ip) :: nxl, nxr
@@ -111,7 +117,7 @@ module vd_1d
 
 contains
   subroutine vd_1d_manager_init(this, nx, nxl_ext, nxr_ext, nxl_vd, nxr_vd, dx, np, &
-       p_min, p_max, dt, sc, hbar, m)
+       p_min, p_max, dt, sc, hbar, m, vd_np_stdev)
     ! Initialize 1D VD manager object
     !
     ! This method is exposed as vd_1d_manager%init
@@ -130,6 +136,8 @@ contains
     ! sc :: semi-classical binning flag
     ! hbar :: hbar units
     ! m :: particle mass
+    ! vd_np_stdev :: REQUIRED if sc = False, number of standard deviations to
+    !   include in quantum VD binning
     class(vd_1d_manager), intent(inout) :: this
     integer(ip), intent(in) :: nx
     integer(ip), intent(in) :: nxl_ext, nxr_ext
@@ -140,6 +148,7 @@ contains
     real(fp), intent(in) :: dt
     logical, intent(in) :: sc
     real(fp), intent(in) :: hbar, m
+    integer(ip), intent(in), optional :: vd_np_stdev
 
     integer(ip) :: i_x
 
@@ -155,6 +164,10 @@ contains
     this%dt=  dt
 
     this%semi_classical = sc
+
+    if (present(vd_np_stdev)) then
+       this%vd_np_stdev= vd_np_stdev
+    end if
 
     this %hbar = hbar
     this%m = m
@@ -180,13 +193,13 @@ contains
     do i_x = 1, this%nxl
        call this%vdl_arr(i_x)%init(this%dx, this%np, this%p_min, this%p_max, &
             this%dp, this%p_range, this%dt, this%semi_classical, &
-            this%hbar, this%m)
+            this%hbar, this%m, vd_np_stdev=this%vd_np_stdev)
     end do
 
     do i_x = 1, this%nxr
        call this%vdr_arr(i_x)%init(this%dx, this%np, this%p_min, this%p_max, &
             this%dp, this%p_range, this%dt, this%semi_classical, &
-            this%hbar, this%m)
+            this%hbar, this%m, vd_np_stdev=this%vd_np_stdev)
     end do
   end subroutine vd_1d_manager_init
 
@@ -285,7 +298,7 @@ contains
   end subroutine vd_1d_manager_finalize
 
   subroutine vd_1d_obj_init(this, dx, np, p_min, p_max, dp, p_range, dt, sc, &
-       hbar, m)
+       hbar, m, vd_np_stdev)
     ! Initialize virtual detector object.
     !
     ! This method is publicly exposed as vd_obj%init
@@ -311,6 +324,7 @@ contains
     logical, intent(in) :: sc
     real(fp), intent(in) :: hbar
     real(fp), intent(in) :: m
+    integer(ip), intent(in), optional :: vd_np_stdev
 
     this%dx = dx
 
@@ -324,6 +338,10 @@ contains
     this%dt = dt
 
     this%semi_classical = sc
+
+    if (present(vd_np_stdev)) then
+       this%vd_np_stdev= vd_np_stdev
+    end if
 
     this%hbar = hbar
     this%m = m
@@ -366,6 +384,11 @@ contains
     real(fp) :: p_var
     real(fp) :: j
 
+    real(fp) :: p_min, p_max
+    real(fp) :: p_stdev
+    integer(ip) :: i_p_min, i_p_max
+    logical :: valid
+
     integer(ip) :: i_p
     real(fp) :: p
     real(fp) :: scale
@@ -378,21 +401,37 @@ contains
     scale = this%dt * abs(j)
 
     if (this%semi_classical) then
-       ! Shift p_mu to be at the nearest grid point
-       i_p = nint( (p_mu - this%p_min) / this%dp )
 
-       if (i_p .ge. 1 .and. i_p .le. this%np) then
+       ! Shift p_mu to be at the nearest grid point
+       i_p = numerics_linspace_index(p_mu, this%p_range)
+       if (i_p .gt. 0_ip) then
           ! Divide scale by dp here so that delta-distribution is normalized
           this%vd_p_arr(i_p) = this%vd_p_arr(i_p) + scale / this%dp
        end if
+
     else
-       ! Make Gaussian of variance p_var around p_mu and populate momentum
-       ! distribution using that
-       do i_p = 1, this%np
-          p = this%p_range(i_p)
-          g = dists_gaussian(p, p_mu, p_var)
-          this%vd_p_arr(i_p) = this%vd_p_arr(i_p) + scale * g
-       end do
+
+       ! Populate momentum distribution around p_mu
+       p_stdev = sqrt(p_var)
+       p_min = p_mu - this%vd_np_stdev * p_stdev
+       p_max = p_mu + this%vd_np_stdev * p_stdev
+
+       i_p_min = numerics_linspace_index(p_min, this%p_range)
+       i_p_max = numerics_linspace_index(p_max, this%p_range)
+
+       call vd_validate_quantum_update(i_p_min, i_p_max, this%np, valid)
+
+       if (valid) then
+          ! Make Gaussian of variance p_var around p_mu and populate momentum
+          ! distribution using that
+          do i_p = i_p_min, i_p_max
+             p = this%p_range(i_p)
+             g = dists_gaussian(p, p_mu, p_var)
+             this%vd_p_arr(i_p) = this%vd_p_arr(i_p) + scale * g
+          end do
+
+       end if
+
     end if
 
     this%net_flux = this%net_flux + scale
