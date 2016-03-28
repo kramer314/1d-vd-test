@@ -35,7 +35,11 @@ vd_p_max = 10.0
 vd_np = 500
 
 ! Semiclassical VD binning
-vd_semi_classical = True
+vd_semi_classical = False
+
+! ONLY used in quantum VD binning
+! Number of standard deviations to include in binning
+vd_np_stdev = 4
 
 ! Residual analysis parameters
 resid_p_eps = 1.0E-6
