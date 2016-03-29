@@ -41,6 +41,9 @@ vd_semi_classical = False
 ! Number of standard deviations to include in binning
 vd_np_stdev = 4
 
+! Disjoint VD switch
+vd_disjoint = True
+
 ! Residual analysis parameters
 resid_p_eps = 1.0E-6
 

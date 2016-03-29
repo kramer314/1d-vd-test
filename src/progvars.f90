@@ -40,6 +40,9 @@ module progvars
   ! left/right number of virtual detector grid points in external grid
   integer(ip) :: nxl_vd, nxr_vd
 
+  ! disjoint VD switch
+  logical :: vd_disjoint
+
   ! semi-classical VD switch
   logical :: vd_semi_classical
 
@@ -93,7 +96,7 @@ contains
     call progvars_set_arrays()
 
     call vdx%init(nx, nxl_external, nxr_external, nxl_vd, nxr_vd, dx, vd_np, &
-         vd_p_min, vd_p_max, dt, vd_semi_classical, hbar, m, &
+         vd_p_min, vd_p_max, dt, vd_semi_classical, vd_disjoint, hbar, m, &
          vd_np_stdev=vd_np_stdev)
     vd_xl_min = vdx%xl_min
     vd_xl_max = vdx%xl_max
@@ -167,6 +170,8 @@ contains
     call config_get_param("vd_np_stdev", vd_np_stdev, success)
 
     call config_get_param("vd_semi_classical", vd_semi_classical, success)
+
+    call config_get_param("vd_disjoint", vd_disjoint, success)
 
     call config_get_param("resid_p_eps", resid_p_eps, success)
 

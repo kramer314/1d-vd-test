@@ -3,27 +3,20 @@ module vd_1d
   use dists, only: dists_gaussian
   use precision, only: ip, fp
 
-  use vd, only: vd_get_local_quantities, vd_validate_quantum_update
+  use vd, only: vd_get_local_quantities, vd_validate_quantum_update, vd_obj
 
   implicit none
 
   private
 
   public vd_1d_obj
-  type vd_1d_obj
+  type, extends(vd_obj) :: vd_1d_obj
      ! 1-dimensional VD point
 
      ! Array of momentum counts; we have to use pointers here because
      ! allocatable arrays can't be used within derived types
      real(fp), pointer :: vd_p_arr(:)
 
-     ! Total probability flux through virtual detector
-     real(fp) :: net_flux
-
-     ! Semi-classical binning flag
-     logical :: semi_classical
-     ! Number of standard deviations to include in quantum VD binning
-     integer(ip) :: vd_np_stdev
 
      ! Spatial grid step
      real(fp) :: dx
@@ -38,13 +31,6 @@ module vd_1d
      ! types
      real(fp), pointer :: p_range(:)
 
-     ! Temporal grid step
-     real(fp) :: dt
-
-     ! Units
-     real(fp) :: hbar
-     real(fp) :: m
-
    contains
      ! Initialize object
      procedure :: init => vd_1d_obj_init
@@ -58,7 +44,7 @@ module vd_1d
 contains
 
   subroutine vd_1d_obj_init(this, dx, np, p_min, p_max, dp, p_range, dt, sc, &
-       hbar, m, vd_np_stdev)
+       vd_disjoint, hbar, m, vd_np_stdev, vd_p_arr)
     ! Initialize virtual detector object.
     !
     ! This method is publicly exposed as vd_obj%init
@@ -71,6 +57,7 @@ contains
     ! p_min :: pointer array referenced to momentum grid
     ! dt :: temporal grid step
     ! sc :: semi-classical flag
+    ! vd_disjoint :: disjoint VD flag
     ! hbar :: units
     ! m :: particle mass
     class(vd_1d_obj), intent(inout) :: this
@@ -82,9 +69,15 @@ contains
     real(fp), pointer, intent(in) :: p_range(:)
     real(fp), intent(in) :: dt
     logical, intent(in) :: sc
+    logical, intent(in) :: vd_disjoint
     real(fp), intent(in) :: hbar
     real(fp), intent(in) :: m
     integer(ip), intent(in), optional :: vd_np_stdev
+    real(fp), pointer, intent(in) :: vd_p_arr(:)
+
+    ! Initialize base class
+    call this%vd_obj%init_vd_base(dt, sc, vd_disjoint, hbar, m, &
+         vd_np_stdev=vd_np_stdev)
 
     this%dx = dx
 
@@ -95,21 +88,13 @@ contains
 
     this%p_range => p_range
 
-    this%dt = dt
-
-    this%semi_classical = sc
-
-    if (present(vd_np_stdev)) then
-       this%vd_np_stdev= vd_np_stdev
+    if (this%vd_disjoint) then
+       this%vd_p_arr => vd_p_arr
+    else
+       allocate(this%vd_p_arr(this%np))
+       this%vd_p_arr(:) = 0.0_fp
     end if
 
-    this%hbar = hbar
-    this%m = m
-
-    allocate(this%vd_p_arr(this%np))
-    this%vd_p_arr(:) = 0.0_fp
-
-    this%net_flux = 0.0_fp
   end subroutine vd_1d_obj_init
 
   subroutine vd_1d_obj_cleanup(this)
@@ -124,7 +109,11 @@ contains
     ! deallocate it here. Instead, we just dereference the pointer.
     nullify(this%p_range)
 
-    deallocate(this%vd_p_arr)
+    if (this%vd_disjoint) then
+       nullify(this%vd_p_arr)
+    else
+       deallocate(this%vd_p_arr)
+    end if
 
   end subroutine vd_1d_obj_cleanup
 

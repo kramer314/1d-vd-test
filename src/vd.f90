@@ -15,7 +15,72 @@ module vd
   public :: vd_get_indices
   public :: vd_validate_quantum_update
 
+  public :: vd_obj
+  type vd_obj
+     ! Base class for VD point
+
+     ! Total probability flux through virtual detector
+     real(fp) :: net_flux
+
+     ! Semi-classical binning flag
+     logical :: semi_classical
+     ! Number of standard deviations to include in quantum VD binning
+     integer(ip) :: vd_np_stdev
+
+     ! Whether detector is disjoint or not
+     ! Non-disjoint detectors allocate their own momentum distribution count
+     !   array
+     ! Disjoint detectors are passed a pointer to an overall momentum
+     !   distribution count array
+     logical :: vd_disjoint
+     
+     ! Temporal grid step
+     real(fp) :: dt
+
+     ! Units
+     real(fp) :: hbar
+     real(fp) :: m
+
+   contains
+     procedure :: init_vd_base => vd_obj_init
+  end type vd_obj
+
 contains
+
+  subroutine vd_obj_init(this, dt, sc, vd_disjoint, hbar, m, vd_np_stdev)
+    ! Initialize base class. This helps to eliminate code reuse in subtypes
+    !
+    ! This method is exposed as this%init_vd_base
+    ! In an inherited type, it is exposed as this%vd_obj%init_vd_base
+    !
+    ! this :: vd_obj instance
+    ! dt :: temporal grid step
+    ! sc :: semi-classical flag
+    ! vd_disjoint :: disjoint VD flag
+    ! hbar :: units
+    ! m :: particle mass
+    ! vd_np_stdev :: REQUIRED if sc = False, number of standard deviations to
+    !   include in quantum VD binning
+    class(vd_obj), intent(inout) :: this
+    real(fp), intent(in) :: dt
+    logical, intent(in) :: sc
+    logical, intent(in) :: vd_disjoint
+    real(fp), intent(in) :: hbar
+    real(fp), intent(in) :: m
+    integer(ip), intent(in), optional :: vd_np_stdev
+
+    this%dt = dt
+    this%semi_classical = sc
+    this%hbar = hbar
+    this%m = m
+    this%vd_disjoint = vd_disjoint
+
+    if (present(vd_np_stdev)) then
+       this%vd_np_stdev = vd_np_stdev
+    end if
+
+    this%net_flux = 0.0_fp
+  end subroutine vd_obj_init
 
   subroutine vd_get_indices(nx, nxl_ext, nxr_ext, nxl_vd, nxr_vd, xl_min, &
        xl_max, xr_min, xr_max)
