@@ -63,7 +63,9 @@ default_json = {
     "t_max": t_max,
     "vd_p_min": vd_p_min,
     "vd_p_max": vd_p_max,
-    "vd_np": vd_np
+    "vd_np": vd_np,
+    "vd_disjoint": False,
+    "vd_np_stdev": 4
 }
 
 
