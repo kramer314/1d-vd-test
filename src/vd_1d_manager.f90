@@ -15,12 +15,14 @@ module vd_1d_manager
      ! 1-dimensional VD manager
 
      ! Virtual detector result; array of momentum counts
-     real(fp), allocatable :: vd_p_arr(:)
+     real(fp), pointer :: vd_p_arr(:)
 
      ! Semi-classical binning flag
      logical :: semi_classical
      ! Number of standard deviations to include in quantum VD binning
      integer(ip) :: vd_np_stdev
+
+     logical :: vd_disjoint
 
      ! Number of left / right virtual detector points
      integer(ip) :: nxl, nxr
@@ -71,7 +73,7 @@ module vd_1d_manager
 contains
 
   subroutine vd_1d_manager_init(this, nx, nxl_ext, nxr_ext, nxl_vd, nxr_vd, dx, np, &
-       p_min, p_max, dt, sc, hbar, m, vd_np_stdev)
+       p_min, p_max, dt, sc, vd_disjoint, hbar, m, vd_np_stdev)
     ! Initialize 1D VD manager object
     !
     ! This method is exposed as vd_1d_manager%init
@@ -90,6 +92,10 @@ contains
     ! sc :: semi-classical binning flag
     ! hbar :: hbar units
     ! m :: particle mass
+    ! vd_disjoint :: whether to treat detectors as disjoint or not
+    !   treating detectors as non-disjoint means each VD allocates their own
+    !   momentum distribution counts which are recombined in this%finalize()
+    !   so it uses (potentially drastically) more memory.
     ! vd_np_stdev :: REQUIRED if sc = False, number of standard deviations to
     !   include in quantum VD binning
     class(vd_1d_manager_obj), intent(inout) :: this
@@ -101,6 +107,7 @@ contains
     real(fp), intent(in) :: p_min, p_max
     real(fp), intent(in) :: dt
     logical, intent(in) :: sc
+    logical, intent(in) :: vd_disjoint
     real(fp), intent(in) :: hbar, m
     integer(ip), intent(in), optional :: vd_np_stdev
 
@@ -118,6 +125,8 @@ contains
     this%dt=  dt
 
     this%semi_classical = sc
+
+    this%vd_disjoint = vd_disjoint
 
     if (present(vd_np_stdev)) then
        this%vd_np_stdev = vd_np_stdev
@@ -147,13 +156,15 @@ contains
     do i_x = 1, this%nxl
        call this%vdl_arr(i_x)%init(this%dx, this%np, this%p_min, this%p_max, &
             this%dp, this%p_range, this%dt, this%semi_classical, &
-            this%hbar, this%m, vd_np_stdev=this%vd_np_stdev)
+            this%vd_disjoint, this%hbar, this%m, &
+            vd_np_stdev=this%vd_np_stdev, vd_p_arr=this%vd_p_arr)
     end do
 
     do i_x = 1, this%nxr
        call this%vdr_arr(i_x)%init(this%dx, this%np, this%p_min, this%p_max, &
             this%dp, this%p_range, this%dt, this%semi_classical, &
-            this%hbar, this%m, vd_np_stdev=this%vd_np_stdev)
+            this%vd_disjoint, this%hbar, this%m, &
+            vd_np_stdev=this%vd_np_stdev, vd_p_arr=this%vd_p_arr)
     end do
   end subroutine vd_1d_manager_init
 
@@ -223,27 +234,29 @@ contains
     real(fp) :: weight_i_x
     real(fp) :: norm
 
-    ! Get total flux
-    do i_x = 1, this%nxl
-       this%net_flux = this%net_flux + this%vdl_arr(i_x)%net_flux
-    end do
+    if (.not. this%vd_disjoint) then
+       ! Get total flux
+       do i_x = 1, this%nxl
+          this%net_flux = this%net_flux + this%vdl_arr(i_x)%net_flux
+       end do
 
-    do i_x = 1, this%nxr
-       this%net_flux = this%net_flux + this%vdr_arr(i_x)%net_flux
-    end do
+       do i_x = 1, this%nxr
+          this%net_flux = this%net_flux + this%vdr_arr(i_x)%net_flux
+       end do
 
-    ! Combine results
-    do i_x = 1, this%nxl
-       weight_i_x = this%vdl_arr(i_x)%net_flux / this%net_flux
-       this%vd_p_arr(:) = this%vd_p_arr(:) + &
-            weight_i_x * this%vdl_arr(i_x)%vd_p_arr(:)
-    end do
+       ! Combine results
+       do i_x = 1, this%nxl
+          weight_i_x = this%vdl_arr(i_x)%net_flux / this%net_flux
+          this%vd_p_arr(:) = this%vd_p_arr(:) + &
+               weight_i_x * this%vdl_arr(i_x)%vd_p_arr(:)
+       end do
 
-    do i_x = 1, this%nxr
-       weight_i_x = this%vdr_arr(i_x)%net_flux / this%net_flux
-       this%vd_p_arr(:) = this%vd_p_arr(:) + &
-            weight_i_x * this%vdr_arr(i_x)%vd_p_arr(:)
-    end do
+       do i_x = 1, this%nxr
+          weight_i_x = this%vdr_arr(i_x)%net_flux / this%net_flux
+          this%vd_p_arr(:) = this%vd_p_arr(:) + &
+               weight_i_x * this%vdr_arr(i_x)%vd_p_arr(:)
+       end do
+    end if
 
     ! Normalize distribution
     norm = numerics_trapz(this%vd_p_arr, this%dp)
