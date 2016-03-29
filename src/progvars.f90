@@ -98,6 +98,7 @@ contains
     call vdx%init(nx, nxl_external, nxr_external, nxl_vd, nxr_vd, dx, vd_np, &
          vd_p_min, vd_p_max, dt, vd_semi_classical, vd_disjoint, hbar, m, &
          vd_np_stdev=vd_np_stdev)
+
     vd_xl_min = vdx%xl_min
     vd_xl_max = vdx%xl_max
     vd_xr_min = vdx%xr_min
@@ -108,6 +109,7 @@ contains
   subroutine progvars_cleanup()
     call vdx%cleanup()
     call progvars_deallocate_arrays()
+    call progvars_deallocate_params()
   end subroutine progvars_cleanup
 
   subroutine progvars_allocate_arrays()
@@ -131,6 +133,16 @@ contains
     deallocate(resid_np_cum_arr)
     deallocate(resid_np_mask)
   end subroutine progvars_deallocate_arrays
+
+  subroutine progvars_deallocate_params
+    deallocate(output_dir)
+    deallocate(log_fname)
+    deallocate(psi_xt_fname)
+    deallocate(vd_p_fname)
+    deallocate(vd_resid_fname)
+    deallocate(vd_resid_analysis_fname)
+    deallocate(vd_pt_fname)
+  end subroutine progvars_deallocate_params
 
   subroutine progvars_set_arrays()
     ! Initialize numerical grids
