@@ -23,10 +23,10 @@ nt = 2000
 
 ! Virtual detector grid parameters
 ! # of points outside interaction region
-nxl_external = 100
-nxr_external = 100
+nxl_external = 0
+nxr_external = 1
 ! # of virtual detector points
-nxl_vd = 1
+nxl_vd = 0
 nxr_vd = 1
 
 ! Virtual detector binning parameters

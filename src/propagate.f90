@@ -19,7 +19,7 @@ contains
   subroutine propagate_cleanup()
     call gaussian_cleanup()
   end subroutine propagate_cleanup
-  
+
   subroutine propagate_psi(psi_arr, i_t)
 
     complex(fp), intent(inout) :: psi_arr(:)
@@ -39,6 +39,6 @@ contains
        x = x_range(i_x)
        psi_arr(i_x) = gaussian_xt(x, t)
     end do
-    
+
   end subroutine propagate_psi
 end module propagate

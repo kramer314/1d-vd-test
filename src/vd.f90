@@ -33,7 +33,7 @@ module vd
      ! Disjoint detectors are passed a pointer to an overall momentum
      !   distribution count array
      logical :: vd_disjoint
-     
+
      ! Temporal grid step
      real(fp) :: dt
 
@@ -110,8 +110,23 @@ contains
     ! We have to be careful here, since Fortran arrays are 1-indexed
     xl_min = nxl_ext + 1
     xl_max = nxl_ext + nxl_vd
+
+    ! Account for no virtual detectors
+    ! We use a trick so that iterations like vd_xl_min - 1, vd-xl_mmax + 1
+    ! don't actually iterate.
+    ! Note that this means we *cannot* use array slices, we must use a do loop
+    if (xl_min > xl_max) then
+       xl_min = 0
+       xl_max = -nx
+    end if
+
     xr_max = nx - nxr_ext
     xr_min = xr_max - (nxr_vd - 1)
+
+    if (xr_min > xr_max) then
+       xr_min = 0
+       xr_max = -nx
+    end if
 
   end subroutine vd_get_indices
 
@@ -197,18 +212,29 @@ contains
     logical :: sane
     character(:), allocatable :: error_msg
 
-    sane = (nxl_ext .gt. 0) .and. (nxr_ext .gt. 0)
+    ! sane = (nxl_ext .gt. 0) .and. (nxr_ext .gt. 0)
+    ! if (.not. sane) then
+    !    error_msg = "No external region defined in numerical grid; "// &
+    !         "stopping abnormally."
+    !    call log_log_critical(error_msg, log_stderr)
+    !    stop 0
+    ! end if
+
+    sane = (nxl_vd .gt. 0) .or. (nxr_vd .gt. 0)
     if (.not. sane) then
-       error_msg = "No external region defined in numerical grid; "// &
-            "stopping abnormally."
+       error_msg = "At least one virtual detectors must be present in "// &
+            "numerical grid; stopping abnormally."
        call log_log_critical(error_msg, log_stderr)
        stop 0
     end if
 
-    sane = (nxl_vd .gt. 0) .and. (nxr_vd .gt. 0)
-    if (.not. sane) then
-       error_msg = "Virtual detectors must be present in numerical grid; "// &
-            "stopping abnormally."
+    sane = .true.
+
+    if ( (nxl_vd .gt. 0 .and. nxl_ext .eq. 0) .or. &
+         (nxr_vd .gt. 0 .and. nxr_ext .eq. 0) ) then
+       sane = .false.
+       error_msg = "At least 1 external point required for a virtual "// &
+            "detector to be present; stopping abnormally."
        call log_log_critical(error_msg, log_stderr)
        stop 0
     end if
