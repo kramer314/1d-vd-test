@@ -14,12 +14,12 @@ sig_x = 1.0
 ! Spatial grid parameters
 x_min = -20.0
 x_max = 20.0
-nx = 10000
+nx = 5000
 
 ! Temporal grid parameters
 t_min = 0.0
 t_max = 10.0
-nt = 2000
+nt = 5000
 
 ! Virtual detector grid parameters
 ! # of points outside interaction region
@@ -45,7 +45,7 @@ vd_np_stdev = 4
 vd_disjoint = True
 
 ! Residual analysis parameters
-resid_p_eps = 1.0E-6
+resid_p_eps = 1.0E-4
 
 ! Output parameters
 output_dir = ./output/

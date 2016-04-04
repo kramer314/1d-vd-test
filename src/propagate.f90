@@ -31,14 +31,19 @@ contains
     t = t_range(i_t)
 
     ! For testing efficiency, only fill VD region
+    !$omp parallel do private(i_x, x)
     do i_x = vd_xl_min - 1, vd_xl_max + 1
        x = x_range(i_x)
        psi_arr(i_x) = gaussian_xt(x, t)
     end do
+    !$omp end parallel do
+
+    !$omp parallel do private(i_x, x)
     do i_x = vd_xr_min - 1, vd_xr_max + 1
        x = x_range(i_x)
        psi_arr(i_x) = gaussian_xt(x, t)
     end do
+    !$omp end parallel do
 
   end subroutine propagate_psi
 end module propagate
