@@ -1,4 +1,8 @@
+! Copyright (c) 2016 Alex Kramer <kramer.alex.kramer@gmail.com>
+! See the LICENSE.txt file at the top-level of this distribution.
+
 module gaussian
+  ! 1D Gaussian module
 
   use progvars
 

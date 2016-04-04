@@ -1,4 +1,4 @@
-# Copyright (c) 2015 Alex Kramer <kramer.alex.kramer@gmail.com>
+# Copyright (c) 2016 Alex Kramer <kramer.alex.kramer@gmail.com>
 # See the LICENSE.txt file at the top-level directory of this distribution.
 
 import os

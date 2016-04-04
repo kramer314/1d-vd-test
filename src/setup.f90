@@ -1,3 +1,6 @@
+! Copyright (c) 2015 Alex Kramer <kramer.alex.kramer@gmail.com>
+! See the LICENSE.txt file at the top-level directory of this distribution.
+
 module setup
   use config, only: config_init, config_cleanup
   use files, only: files_ensure_dir
