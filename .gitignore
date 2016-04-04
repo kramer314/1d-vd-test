@@ -1,0 +1,7 @@
+# Ignore default directories
+deps/
+build/
+output/
+
+# Ignore SCons databse
+.sconsign.dblite
