@@ -4,10 +4,12 @@ import multiprocessing
 
 threads = 4
 
+os.environ["OMP_NUM_THREADS"] = "1"
+
 dev_null = "/dev/null"
 input_dir = "./convergence_inputs/"
 
-log_file = dev_null
+log_file = "log.log"
 
 call = "nice -n 19 ionice -c2 -n7 ../build/main.x "
 call_end = " >> " + log_file
@@ -25,7 +27,10 @@ if __name__ == "__main__":
       syscall_arr.append(syscall)
 
    if log_file is not dev_null:
-      os.remove(log_file)
+      try:
+         os.remove(log_file)
+      except:
+         pass
 
    start_time = time.time()
 
